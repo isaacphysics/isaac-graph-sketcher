@@ -4,7 +4,8 @@
   "description": "A graph sketching application to serve Isaac Physics.",
   "main": "./dist/bundle.js",
   "files": [
-    "dist"
+    "dist",
+    "src"
   ],
   "scripts": {
     "dev": "webpack --watch --mode development",

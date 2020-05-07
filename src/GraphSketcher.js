@@ -1,6 +1,13 @@
-import * as GraphView from './GraphView';
-import * as GraphUtils from './GraphUtils';
+import p5 from 'p5';
+import GraphView from './GraphView'; 
 
-export default {
-
+export function makeGraphView() {
+    let sketch;
+    let p = new p5((instance) => {
+        sketch = new GraphView(instance);
+        return sketch;
+    }, element);
+    return { sketch, p };
 }
+
+export * from './GraphView';
