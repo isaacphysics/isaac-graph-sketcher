@@ -53,7 +53,7 @@ const s = (p, _width, _height) => {
     let clickedCurveIdx;
 
     let scope = {};
-
+    let canvas;
 
     function isOverButton(pt, button) {
         if (button.position() == undefined) {
@@ -75,13 +75,13 @@ const s = (p, _width, _height) => {
         }
 
         let elements = [];
-        elements.push(element.find(".redo"));
-        elements.push(element.find(".undo"));
-        elements.push(element.find(".poly"));
-        elements.push(element.find(".straight"));
-        elements.push(element.find(".trash-button"));
-        elements.push(element.find(".submit"));
-        elements.push(element.find(".color-select"));
+        elements.push(document.getElementById("graph-sketcher-ui-redo"));
+        elements.push(document.getElementById("graph-sketcher-ui-undo"));
+        elements.push(document.getElementById("graph-sketcher-ui-poly"));
+        elements.push(document.getElementById("graph-sketcher-ui-straight"));
+        elements.push(document.getElementById("graph-sketcher-ui-trash-button"));
+        elements.push(document.getElementById("graph-sketcher-ui-submit"));
+        elements.push(document.getElementById("graph-sketcher-ui-color-select"));
 
         for (let i = 0; i < elements.length; i++) {
             if (isOverButton(pt, elements[i])) {
@@ -94,7 +94,7 @@ const s = (p, _width, _height) => {
 
     // run in the beginning by p5 library
     p.setup = function() {
-        p.createCanvas(canvasProperties.width, canvasProperties.height);
+        canvas = p.createCanvas(canvasProperties.width, canvasProperties.height);
         p.noLoop();
         p.cursor(p.ARROW);
         reDraw();
