@@ -2,62 +2,60 @@ import p5 from 'p5';
 import GraphView from './GraphView';
 import * as GraphUtils from './GraphUtils';
 
-const s = (p, _width, _height) => {
+class s {
+    constructor(p, _width, _height) {
+        this.p = p;
+        // for redo and undo
+        this.p.checkPoint = void 0;
+        this.p.checkPointsUndo = [];
+        this.p.checkPointsRedo = [];
 
-    // canvas coefficients
-    let canvasProperties = {width: _width, height: _height};
+        this.p.setup = this.setup;
 
-    const MOVE_SYMBOL_COLOR = [151];
-    const CURVE_LIMIT = 3;
-    const MOUSE_DETECT_RADIUS = 10;
-    const DEFAULT_KNOT_COLOR = [77,77,77];
+        this.canvasProperties = { width: _width, height: _height };
+        this.graphView = new GraphView(p, _width, _height);
+    }
+
+    MOVE_SYMBOL_COLOR = [151];
+    CURVE_LIMIT = 3;
+    MOUSE_DETECT_RADIUS = 10;
+    DEFAULT_KNOT_COLOR = [77,77,77];
 
     // action recorder
-    let action = undefined;
-    let isMouseDragged;
-    let releasePt;
-    let key = undefined;
+    action;
+    isMouseDragged;
+    releasePt;
 
     // for drawing curve
-    let drawnPts = [];
-    let drawnColorIdx;
-    let lineStart;
-    let lineEnd;
+    drawnPts = [];
+    drawnColorIdx;
+    
+    prevMousePt;
 
-    let prevMousePt;
-
-    // for moving and stretching curve
-    let movedCurveIdx;
-    let stretchMode;
-    let isMaxima = undefined;
+    // fving and stretching curve
+    movedCurveIdx;
+    stretchMode;
+    isMaxima;
 
 
-    // for moving symbols
-    let movedSymbol;
-    let bindedKnot;
-    let symbolType;
+    // fving symbols
+    movedSymbol;
+    bindedKnot;
+    symbolType;
 
 
-    // for redo and undo
-    p.checkPoint;
-    p.checkPointsUndo = [];
-    p.checkPointsRedo = [];
+    curves = [];
+    clickedKnot;
+    clickedKnotId;
+    clickedCurve;
+    clickedCurveIdx;
 
-    // For visualisation using GraphView.js methods
-    let graphView = new GraphView(p, _width, _height);
+    scope = {};
+    canvas;
+    elements = [];
+    colorSelect;
 
-    let curves = [];
-    let clickedKnot = null;
-    let clickedKnotId;
-    let clickedCurve;
-    let clickedCurveIdx;
-
-    let scope = {};
-    let canvas;
-    let elements = [];
-    let colorSelect;
-
-    function isOverButton(pt, button) {
+    isOverButton(pt, button) {
         const rect = button.getBoundingClientRect();
 
         if (rect) {
@@ -71,14 +69,14 @@ const s = (p, _width, _height) => {
     }
 
     // Mouse is inactive if over buttons - stops curves being drawn where they can't be seen
-    function isActive(pt) {
+    isActive(pt) {
 
         if (!(pt[0] > 0 && pt[0] < canvasProperties.width && pt[1] > 0 && pt[1] < canvasProperties.height)) {
             return false;
         }
 
-        for (let i = 0; i < elements.length; i++) {
-            if (isOverButton(pt, elements[i])) {
+        for (let i = 0; i < this.elements.length; i++) {
+            if (isOverButton(pt, this.elements[i])) {
                 return false;
             }
         }
@@ -87,24 +85,24 @@ const s = (p, _width, _height) => {
     }
 
     // run in the beginning by p5 library
-    p.setup = function() {
-        canvas = p.createCanvas(canvasProperties.width, canvasProperties.height);
+    setup() {
+        this.canvas = this.p.createCanvas(canvasProperties.width, canvasProperties.height);
         elements.push(document.getElementById("graph-sketcher-ui-redo"));
         elements.push(document.getElementById("graph-sketcher-ui-undo"));
         elements.push(document.getElementById("graph-sketcher-ui-poly"));
         elements.push(document.getElementById("graph-sketcher-ui-straight"));
         elements.push(document.getElementById("graph-sketcher-ui-trash-button"));
         elements.push(document.getElementById("graph-sketcher-ui-submit"));
-        colorSelect = document.getElementById("graph-sketcher-ui-color-select");
-        elements.push(colorSelect);
+        this.colorSelect = document.getElementById("graph-sketcher-ui-color-select");
+        elements.push(this.colorSelect);
 
-        p.noLoop();
-        p.cursor(p.ARROW);
+        this.p.noLoop();
+        this.p.cursor(p.ARROW);
         reDraw();
     }
 
     // Check if movement to new position is over an actionable object, so can render appropriately
-    p.mouseMoved = function(e) {
+    mouseMoved(e) {
         let mousePosition = GraphUtils.getMousePt(e);
 
         function detect(x, y) {
@@ -119,85 +117,85 @@ const s = (p, _width, _height) => {
         let found = "notFound";
 
         if (found == "notFound") {
-            found = GraphUtils.overItem(curves, e, MOUSE_DETECT_RADIUS, found);
+            found = GraphUtils.overItem(this.curves, e, this.MOUSE_DETECT_RADIUS, found);
             if (found == "overKnot") {
-                p.cursor(p.HAND);
+                this.p.cursor(p.HAND);
                 return;
             } else if ((found == "overAttachedSymbol") || (found == "overFreeSymbol") || (found == "overCurve")) {
-                p.cursor(p.MOVE);
+                this.p.cursor(p.MOVE);
                 return;
             } else if (found == "notFound") {
-                p.cursor(p.CROSS);
+                this.p.cursor(p.CROSS);
                 reDraw();
             }
         }
 
         // stretch box
-        if (clickedCurveIdx != undefined) {
-            let c = curves[clickedCurveIdx];
+        if (this.clickedCurveIdx != undefined) {
+            let c = this.curves[this.clickedCurveIdx];
             if (mousePosition[0] >= c.minX && mousePosition[0] <= c.maxX && mousePosition[1] >= c.minY && mousePosition[1] <= c.maxY) {
                 found = true;
-                p.cursor(p.MOVE);
+                this.p.cursor(p.MOVE);
             } else if (detect(c.minX, c.minY) || detect(c.maxX, c.minY) || detect(c.minX, c.maxY) || detect(c.maxX, c.maxY)) {
-                p.push();
-                p.fill(graphView.KNOT_DETECT_COLOR);
+                this.p.push();
+                this.p.fill(this.graphView.KNOT_DETECT_COLOR);
                 if (detect(c.minX, c.minY)) {
-                    p.rect(c.minX - 4, c.minY - 4, 8, 8);
+                    this.p.rect(c.minX - 4, c.minY - 4, 8, 8);
                 } else if (detect(c.maxX, c.minY)) {
-                    p.rect(c.maxX - 4, c.minY - 4, 8, 8);
+                    this.p.rect(c.maxX - 4, c.minY - 4, 8, 8);
                 } else if (detect(c.minX, c.maxY)) {
-                    p.rect(c.minX - 4, c.maxY - 4, 8, 8);
+                    this.p.rect(c.minX - 4, c.maxY - 4, 8, 8);
                 } else {
-                    p.rect(c.maxX - 4, c.maxY - 4, 8, 8);
+                    this.p.rect(c.maxX - 4, c.maxY - 4, 8, 8);
                 }
 
-                p.pop;
+                this.p.pop;
 
                 found = true;
-                p.cursor(p.MOVE);
+                this.p.cursor(p.MOVE);
             } else if (detect((c.minX + c.maxX) / 2, c.minY - 3) || detect((c.minX + c.maxX) / 2, c.maxY + 3)
                 || detect(c.minX - 3, (c.minY + c.maxY) / 2) || detect(c.maxX + 3, (c.minY + c.maxY) / 2)) {
 
-                p.push();
-                p.fill(graphView.KNOT_DETECT_COLOR);
+                this.p.push();
+                this.p.fill(this.graphView.KNOT_DETECT_COLOR);
                 if (detect((c.minX + c.maxX) / 2, c.minY - 3)) {
-                    p.triangle((c.minX + c.maxX) / 2 - 5, c.minY - 2, (c.minX + c.maxX) / 2 + 5, c.minY - 2, (c.minX + c.maxX) / 2, c.minY - 7);
+                    this.p.triangle((c.minX + c.maxX) / 2 - 5, c.minY - 2, (c.minX + c.maxX) / 2 + 5, c.minY - 2, (c.minX + c.maxX) / 2, c.minY - 7);
                 } else if (detect((c.minX + c.maxX) / 2, c.maxY + 3)) {
-                    p.triangle((c.minX + c.maxX) / 2 - 5, c.maxY + 2, (c.minX + c.maxX) / 2 + 5, c.maxY + 2, (c.minX + c.maxX) / 2, c.maxY + 7);
+                    this.p.triangle((c.minX + c.maxX) / 2 - 5, c.maxY + 2, (c.minX + c.maxX) / 2 + 5, c.maxY + 2, (c.minX + c.maxX) / 2, c.maxY + 7);
                 } else if (detect(c.minX - 3, (c.minY + c.maxY) / 2)) {
-                    p.triangle(c.minX - 2, (c.minY + c.maxY) / 2 - 5, c.minX - 2, (c.minY + c.maxY) / 2 + 5, c.minX - 7, (c.minY + c.maxY) / 2);
+                    this.p.triangle(c.minX - 2, (c.minY + c.maxY) / 2 - 5, c.minX - 2, (c.minY + c.maxY) / 2 + 5, c.minX - 7, (c.minY + c.maxY) / 2);
                 } else {
-                    p.triangle(c.maxX + 2, (c.minY + c.maxY) / 2 - 5, c.maxX + 2, (c.minY + c.maxY) / 2 + 5, c.maxX + 7, (c.minY + c.maxY) / 2);
+                    this.p.triangle(c.maxX + 2, (c.minY + c.maxY) / 2 - 5, c.maxX + 2, (c.minY + c.maxY) / 2 + 5, c.maxX + 7, (c.minY + c.maxY) / 2);
                 }
-                p.pop();
+                this.p.pop();
 
                 found = true;
-                p.cursor(p.MOVE);
+                this.p.cursor(p.MOVE);
             }
         }
     }
 
     // Determines type of action when clicking on something within the canvas
-    p.mousePressed = function(e) {
+    mousePressed(e) {
 
-        isMouseDragged = false;
-        action = undefined;
+        this.isMouseDragged = false;
+        this.action = undefined;
 
-        movedSymbol = undefined;
-        bindedKnot = undefined;
-        symbolType = undefined;
+        this.movedSymbol = undefined;
+        this.bindedKnot = undefined;
+        this.symbolType = undefined;
 
-        drawnPts = [];
-        drawnColorIdx = undefined;
+        this.drawnPts = [];
+        this.drawnColorIdx = undefined;
 
-        movedCurveIdx = undefined;
-        prevMousePt = undefined;
+        this.movedCurveIdx = undefined;
+        this.prevMousePt = undefined;
 
-        releasePt = undefined;
+        this.releasePt = undefined;
 
 
         let mousePosition = GraphUtils.getMousePt(e);
-        releasePt = mousePosition;
+        this.releasePt = mousePosition;
 
         // this function does not react if the mouse is over buttons or outside the canvas.
         if (!isActive(mousePosition)) {
@@ -208,116 +206,116 @@ const s = (p, _width, _height) => {
             return (Math.abs(mousePosition[0] - x) < 5 && Math.abs(mousePosition[1] - y) < 5);
         }
         // record down mousePosition status, may be used later for undo.
-        p.checkPoint = {};
-        p.checkPoint.curvesJSON = JSON.stringify(curves);
+        this.p.checkPoint = {};
+        this.p.checkPoint.curvesJSON = JSON.stringify(this.curves);
 
         let found = false;
 
         // check if stretching curve
-        if (clickedCurveIdx != undefined) {
-            let c = curves[clickedCurveIdx];
+        if (this.clickedCurveIdx != undefined) {
+            let c = this.curves[this.clickedCurveIdx];
 
             if (detect(c.minX, c.minY) || detect(c.maxX, c.minY) || detect(c.minX, c.maxY) || detect(c.maxX, c.maxY)
                 || detect((c.minX + c.maxX)/2, c.minY - 3) || detect((c.minX + c.maxX)/2, c.maxY + 3)
                 || detect(c.minX - 3, (c.minY + c.maxY)/2) || detect(c.maxX + 3, (c.minY + c.maxY)/2)) {
 
                 if (detect(c.minX, c.minY)) {
-                    stretchMode = "bottomLeft";
+                    this.stretchMode = "bottomLeft";
                 } else if (detect(c.maxX, c.minY)) {
-                    stretchMode = "bottomRight";
+                    this.stretchMode = "bottomRight";
                 } else if (detect(c.maxX, c.maxY)) {
-                    stretchMode = "topRight";
+                    this.stretchMode = "topRight";
                 } else if (detect(c.minX, c.maxY)) {
-                    stretchMode = "topLeft";
+                    this.stretchMode = "topLeft";
                 } else if (detect((c.minX + c.maxX)/2, c.minY - 3)) {
-                    stretchMode = "bottomMiddle";
+                    this.stretchMode = "bottomMiddle";
                 } else if (detect((c.minX + c.maxX)/2, c.maxY + 3)) {
-                    stretchMode = "topMiddle";
+                    this.stretchMode = "topMiddle";
                 } else if (detect(c.minX - 3, (c.minY + c.maxY)/2)) {
-                    stretchMode = "leftMiddle";
+                    this.stretchMode = "leftMiddle";
                 } else {
-                    stretchMode = "rightMiddle";
+                    this.stretchMode = "rightMiddle";
                 }
 
 
-                action = "STRETCH_CURVE";
-                clickedKnot = null;
-                prevMousePt = mousePosition;
+                this.action = "STRETCH_CURVE";
+                this.clickedKnot = null;
+                this.prevMousePt = mousePosition;
                 return;
             }
         }
 
-        if (curves != []) {
-            for (let i = 0; i < curves.length; i++) {
-                let maxima = curves[i].maxima;
-                let minima = curves[i].minima;
+        if (this.curves != []) {
+            for (let i = 0; i < this.curves.length; i++) {
+                let maxima = this.curves[i].maxima;
+                let minima = this.curves[i].minima;
                 for (let j = 0; j < maxima.length; j++) {
                     let knot = maxima[j];
-                    if (GraphUtils.getDist(mousePosition, knot) < MOUSE_DETECT_RADIUS + 10){
-                        clickedCurve = i;
-                        action = "STRETCH_POINT";
-                        clickedKnotId = j;
-                        prevMousePt = mousePosition;
-                        isMaxima = true;
+                    if (GraphUtils.getDist(mousePosition, knot) < this.MOUSE_DETECT_RADIUS + 10){
+                        this.clickedCurve = i;
+                        this.action = "STRETCH_POINT";
+                        this.clickedKnotId = j;
+                        this.prevMousePt = mousePosition;
+                        this.isMaxima = true;
                         return;
                     }
                 }
                 for (let j = 0; j < minima.length; j++) {
                     let knot = minima[j];
-                    if (GraphUtils.getDist(mousePosition, knot) < MOUSE_DETECT_RADIUS + 10){
-                        clickedCurve = i;
-                        action = "STRETCH_POINT";
-                        clickedKnotId = j;
-                        prevMousePt = mousePosition;
-                        isMaxima = false;
+                    if (GraphUtils.getDist(mousePosition, knot) < this.MOUSE_DETECT_RADIUS + 10){
+                        this.clickedCurve = i;
+                        this.action = "STRETCH_POINT";
+                        this.clickedKnotId = j;
+                        this.prevMousePt = mousePosition;
+                        this.isMaxima = false;
                         return;
                     }
                 }
             }
             let tc = [];
-            for (let i = 0; i < curves.length; i++) {
-                for (let j = 0; j < curves[i].pts.length; j++) {
-                    if (GraphUtils.getDist(mousePosition, curves[i].pts[j]) < MOUSE_DETECT_RADIUS) {
-                        clickedCurveIdx = i;
-                        tc = curves[clickedCurveIdx];
+            for (let i = 0; i < this.curves.length; i++) {
+                for (let j = 0; j < this.curves[i].pts.length; j++) {
+                    if (GraphUtils.getDist(mousePosition, this.curves[i].pts[j]) < this.MOUSE_DETECT_RADIUS) {
+                        this.clickedCurveIdx = i;
+                        tc = this.curves[this.clickedCurveIdx];
                         break;
                     }
                 }
             }
             if (tc != undefined) {
                 if (mousePosition[0] >= tc.minX && mousePosition[0] <= tc.maxX && mousePosition[1] >= tc.minY && mousePosition[1] <= tc.maxY) {
-                    movedCurveIdx = clickedCurveIdx;
-                    action = "MOVE_CURVE";
-                    clickedKnot = null;
-                    prevMousePt = mousePosition;
+                    this.movedCurveIdx = this.clickedCurveIdx;
+                    this.action = "MOVE_CURVE";
+                    this.clickedKnot = null;
+                    this.prevMousePt = mousePosition;
                     return;
                 }
             }
         }
 
-        if (curves.length < CURVE_LIMIT){
-            action = "DRAW_CURVE";
+        if (this.curves.length < this.CURVE_LIMIT){
+            this.action = "DRAW_CURVE";
         }
 
 
-        if (clickedCurveIdx != undefined || clickedKnot != null) {
-            clickedCurveIdx = undefined;
-            clickedKnot = null;
+        if (this.clickedCurveIdx != undefined || this.clickedKnot != null) {
+            this.clickedCurveIdx = undefined;
+            this.clickedKnot = null;
             reDraw();
         }
 
         // get drawnColor
-        switch (colorSelect.value) {
+        switch (this.colorSelect.value) {
             case "Blue": {
-                drawnColorIdx = 0;
+                this.drawnColorIdx = 0;
                 break;
             }
             case "Orange": {
-                drawnColorIdx = 1;
+                this.drawnColorIdx = 1;
                 break;
             }
             case "Green": {
-                drawnColorIdx = 2;
+                this.drawnColorIdx = 2;
                 break;
             }
         }
@@ -325,13 +323,13 @@ const s = (p, _width, _height) => {
     }
 
     // Keep actions for curve manipulation together
-    p.mouseDragged = function(e) {
-        isMouseDragged = true;
+    mouseDragged = function(e) {
+        this.isMouseDragged = true;
         let mousePosition = GraphUtils.getMousePt(e);
-        releasePt = mousePosition;
+        this.releasePt = mousePosition;
 
-        if (action == "STRETCH_POINT") {
-            let selectedCurve = curves[clickedCurve];
+        if (this.action == "STRETCH_POINT") {
+            let selectedCurve = this.curves[this.clickedCurve];
             // we need to know the (important) ordered end and turning points
             let importantPoints = [];
             if (selectedCurve.pts[0][0] > selectedCurve.pts[selectedCurve.pts.length - 1][0]) {
@@ -346,41 +344,41 @@ const s = (p, _width, _height) => {
             importantPoints.sort(function(a, b){return a[0] - b[0]});
 
             // maxima and minima are treated in slightly different ways
-            if (isMaxima !== undefined) {
-                curves[clickedCurve] = GraphUtils.stretchTurningPoint(importantPoints, e, selectedCurve, isMaxima, clickedKnotId, prevMousePt, canvasProperties);
+            if (this.isMaxima !== undefined) {
+                this.curves[this.clickedCurve] = GraphUtils.stretchTurningPoint(importantPoints, e, selectedCurve, this.isMaxima, this.clickedKnotId, this.prevMousePt, canvasProperties);
             }
 
             reDraw();
-            prevMousePt = mousePosition;
+            this.prevMousePt = mousePosition;
 
-        } else if (action == "MOVE_CURVE") {
-            p.cursor(p.MOVE);
+        } else if (this.action == "MOVE_CURVE") {
+            this.p.cursor(p.MOVE);
 
             // scope.trashActive = isOverButton(mousePosition, element.find(".trash-button"));
 
-            let dx = mousePosition[0] - prevMousePt[0];
-            let dy = mousePosition[1] - prevMousePt[1];
-            prevMousePt = mousePosition;
-            GraphUtils.translateCurve(curves[movedCurveIdx], dx, dy, canvasProperties);
+            let dx = mousePosition[0] - this.prevMousePt[0];
+            let dy = mousePosition[1] - this.prevMousePt[1];
+            this.prevMousePt = mousePosition;
+            GraphUtils.translateCurve(this.curves[this.movedCurveIdx], dx, dy, canvasProperties);
             reDraw();
 
-        } else if (action == "STRETCH_CURVE") {
-            p.cursor(p.MOVE);
+        } else if (this.action == "STRETCH_CURVE") {
+            this.p.cursor(p.MOVE);
 
-            let dx = mousePosition[0] - prevMousePt[0];
-            let dy = mousePosition[1] - prevMousePt[1];
-            prevMousePt = mousePosition;
+            let dx = mousePosition[0] - this.prevMousePt[0];
+            let dy = mousePosition[1] - this.prevMousePt[1];
+            this.prevMousePt = mousePosition;
 
-            let currentCurve = curves[clickedCurveIdx];
+            let currentCurve = this.curves[this.clickedCurveIdx];
 
             // calculate old x,y range
             let orx = currentCurve.maxX - currentCurve.minX;
             let ory = currentCurve.maxY - currentCurve.minY;
 
-            graphView.drawCorner(stretchMode, currentCurve);
+            this.graphView.drawCorner(this.stretchMode, currentCurve);
 
             // update the position of stretched vertex
-            switch (stretchMode) {
+            switch (this.stretchMode) {
                 case "bottomLeft": {
                     if (orx < 30 && dx > 0  || ory < 30 && dy > 0) {
                         return;
@@ -448,7 +446,7 @@ const s = (p, _width, _height) => {
             let nry = currentCurve.maxY - currentCurve.minY;
 
             // stretch the curve
-            switch (stretchMode) {
+            switch (this.stretchMode) {
                 case "bottomLeft": {
                     GraphUtils.stretchCurve(currentCurve, orx, ory, nrx, nry, currentCurve.maxX, currentCurve.maxY, canvasProperties);
                     break;
@@ -483,41 +481,41 @@ const s = (p, _width, _height) => {
                 }
             }
             reDraw();
-            graphView.drawCorner(stretchMode, currentCurve);
+            this.graphView.drawCorner(this.stretchMode, currentCurve);
 
-        } else if (action == "DRAW_CURVE") {
-            p.cursor(p.CROSS);
-            if (curves.length < CURVE_LIMIT) {
-                p.push();
-                p.stroke(graphView.CURVE_COLORS[drawnColorIdx]);
-                p.strokeWeight(graphView.CURVE_STRKWEIGHT);
-                if (drawnPts.length > 0) {
-                    let precedingPoint = drawnPts[drawnPts.length - 1];
-                    p.line(precedingPoint[0], precedingPoint[1], mousePosition[0], mousePosition[1]);
+        } else if (this.action == "DRAW_CURVE") {
+            this.p.cursor(p.CROSS);
+            if (this.curves.length < this.CURVE_LIMIT) {
+                this.p.push();
+                this.p.stroke(this.CURVE_COLORS[this.drawnColorIdx]);
+                this.p.strokeWeight(this.CURVE_STRKWEIGHT);
+                if (this.drawnPts.length > 0) {
+                    let precedingPoint = this.drawnPts[this.drawnPts.length - 1];
+                    this.p.line(precedingPoint[0], precedingPoint[1], mousePosition[0], mousePosition[1]);
                 }
-                p.pop();
-                drawnPts.push(mousePosition);
+                this.p.pop();
+                this.drawnPts.push(mousePosition);
             }
         }
     }
 
     // Need to know where to update points to - gives final position
-    p.mouseReleased = function(_e) {
-        let mousePosition = releasePt;
+    mouseReleased = function(_e) {
+        let mousePosition = this.releasePt;
 
         // if it is just a click, handle click in the following if block
-        if (!isMouseDragged) {
+        if (!this.isMouseDragged) {
 
             // clean up the mess of MOVE_SYMBOL and MOVE_CURVE
-            if (action  == "MOVE_SYMBOL") {
-                if (bindedKnot == undefined) {
-                    freeSymbols.push(movedSymbol);
+            if (this.action  == "MOVE_SYMBOL") {
+                if (this.bindedKnot == undefined) {
+                    freeSymbols.push(this.movedSymbol);
                 } else {
-                    bindedKnot[symbolType] = movedSymbol;
+                    this.bindedKnot[this.symbolType] = this.movedSymbol;
                 }
                 reDraw();
 
-            } else if (action == "MOVE_CURVE" || action == "STRETCH_CURVE" || action == "STRETCH_POINT") {
+            } else if (this.action == "MOVE_CURVE" || this.action == "STRETCH_CURVE" || this.action == "STRETCH_POINT") {
                 reDraw();
             }
 
@@ -528,11 +526,11 @@ const s = (p, _width, _height) => {
 
 
             // check if show stretch box
-            for (let i = 0; i < curves.length; i++) {
-                let pts = curves[i].pts;
+            for (let i = 0; i < this.curves.length; i++) {
+                let pts = this.curves[i].pts;
                 for (let j = 0; j < pts.length; j++) {
-                    if (GraphUtils.getDist(pts[j], mousePosition) < MOUSE_DETECT_RADIUS) {
-                        clickedCurveIdx = i;
+                    if (GraphUtils.getDist(pts[j], mousePosition) < this.MOUSE_DETECT_RADIUS) {
+                        this.clickedCurveIdx = i;
                         reDraw();
                         return;
                     }
@@ -540,76 +538,76 @@ const s = (p, _width, _height) => {
             }
 
 
-            if (clickedKnot != null || clickedCurveIdx != undefined) {
-                clickedKnot = null;
-                clickedCurveIdx = undefined;
+            if (this.clickedKnot != null || this.clickedCurveIdx != undefined) {
+                this.clickedKnot = null;
+                this.clickedCurveIdx = undefined;
                 reDraw();
             }
 
             return;
         }
 
-        if (action == "MOVE_CURVE") {
+        if (this.action == "MOVE_CURVE") {
 
-            p.checkPointsUndo.push(p.checkPoint);
-            p.checkPointsRedo = [];
+            this.p.checkPointsUndo.push(p.checkPoint);
+            this.p.checkPointsRedo = [];
 
             // for deletion
             // if (scope.trashActive) {
-            //     let curve = (curves.splice(movedCurveIdx, 1))[0];
+            //     let curve = (this.curves.splice(this.movedCurveIdx, 1))[0];
 
-            //     clickedCurveIdx = undefined;
+            //     this.clickedCurveIdx = undefined;
             // }
 
             // scope.trashActive = false;
             // scope.$apply();
             reDraw();
 
-        } else if (action == "STRETCH_CURVE") {
-            p.checkPointsUndo.push(p.checkPoint);
-            p.checkPointsRedo = [];
+        } else if (this.action == "STRETCH_CURVE") {
+            this.p.checkPointsUndo.push(p.checkPoint);
+            this.p.checkPointsRedo = [];
 
-            // let c = curves[clickedCurveIdx];
+            // let c = this.curves[this.clickedCurveIdx];
 
-        } else if (action == "STRETCH_POINT") {
-            p.checkPointsUndo.push(p.checkPoint);
-            p.checkPointsRedo = [];
+        } else if (this.action == "STRETCH_POINT") {
+            this.p.checkPointsUndo.push(p.checkPoint);
+            this.p.checkPointsRedo = [];
 
-            // let c = curves[clickedCurveIdx];
+            // let c = this.curves[this.clickedCurveIdx];
 
-        } else if (action == "DRAW_CURVE") {
+        } else if (this.action == "DRAW_CURVE") {
 
-            if (curves.length < CURVE_LIMIT){
+            if (this.curves.length < this.CURVE_LIMIT){
 
                 let curve;
 
-                if (GraphUtils.sample(drawnPts).length < 3) {
+                if (GraphUtils.sample(this.drawnPts).length < 3) {
                     return;
                 }
 
-                p.checkPointsUndo.push(p.checkPoint);
-                p.checkPointsRedo = [];
+                this.p.checkPointsUndo.push(p.checkPoint);
+                this.p.checkPointsRedo = [];
                 // scope.$apply();
 
                 // adjustment of start and end to attach to the axis automatically.
-                if (Math.abs(drawnPts[0][1] - canvasProperties.height/2) < 3) {
-                    drawnPts[0][1] = canvasProperties.height/2;
+                if (Math.abs(this.drawnPts[0][1] - canvasProperties.height/2) < 3) {
+                    this.drawnPts[0][1] = canvasProperties.height/2;
                 }
-                if (Math.abs(drawnPts[0][0] - canvasProperties.width/2) < 3) {
-                    drawnPts[0][0] = canvasProperties.width/2;
+                if (Math.abs(this.drawnPts[0][0] - canvasProperties.width/2) < 3) {
+                    this.drawnPts[0][0] = canvasProperties.width/2;
                 }
-                if (Math.abs(drawnPts[drawnPts.length - 1][1] - canvasProperties.height/2) < 3) {
-                    drawnPts[drawnPts.length - 1][1] = canvasProperties.height/2;
+                if (Math.abs(this.drawnPts[this.drawnPts.length - 1][1] - canvasProperties.height/2) < 3) {
+                    this.drawnPts[this.drawnPts.length - 1][1] = canvasProperties.height/2;
                 }
-                if (Math.abs(drawnPts[drawnPts.length - 1][0] - canvasProperties.width/2) < 3) {
-                    drawnPts[drawnPts.length - 1][0] = canvasProperties.width/2;
+                if (Math.abs(this.drawnPts[this.drawnPts.length - 1][0] - canvasProperties.width/2) < 3) {
+                    this.drawnPts[this.drawnPts.length - 1][0] = canvasProperties.width/2;
                 }
 
                 let pts = [];
                 if (scope.selectedLineType == "bezier") {
-                    pts = GraphUtils.bezierLineStyle(GraphUtils.sample(drawnPts));
+                    pts = GraphUtils.bezierLineStyle(GraphUtils.sample(this.drawnPts));
                 } else if (scope.selectedLineType == "linear") {
-                    pts = GraphUtils.linearLineStyle([drawnPts[0],drawnPts[drawnPts.length-1]])
+                    pts = GraphUtils.linearLineStyle([this.drawnPts[0],this.drawnPts[this.drawnPts.length-1]])
                 }
                 curve = {};
                 curve.pts = pts;
@@ -639,9 +637,9 @@ const s = (p, _width, _height) => {
                     curve.maxima = [];
                     curve.minima = [];
                 }
-                curve.colorIdx = drawnColorIdx;
+                curve.colorIdx = this.drawnColorIdx;
 
-                curves.push(curve);
+                this.curves.push(curve);
                 reDraw();
             }
 
@@ -650,47 +648,47 @@ const s = (p, _width, _height) => {
     }
 
     // Would like to be used on touch screen devices, this simply facilitates it
-    p.touchStarted = function(e) {
-        p.mousePressed(e.touches[0]);
+    touchStarted = function(e) {
+        this.p.mousePressed(e.touches[0]);
     }
 
-    p.touchMoved = function(e) {
-        p.mouseDragged(e.touches[0]);
+    touchMoved = function(e) {
+        this.p.mouseDragged(e.touches[0]);
     }
 
-    p.touchEnded = function(e) {
-        p.mouseReleased(e);
+    touchEnded = function(e) {
+        this.p.mouseReleased(e);
     }
 
-    p.windowResized = function() {
-        let data = GraphUtils.encodeData(false, canvasProperties, curves);
+    windowResized = function() {
+        let data = GraphUtils.encodeData(false, canvasProperties, this.curves);
         canvasProperties.width = window.innerWidth;
         canvasProperties.height = window.innerHeight;
-        p.resizeCanvas(window.innerWidth, window.innerHeight);
+        this.p.resizeCanvas(window.innerWidth, window.innerHeight);
         GraphUtils.decodeData(data, canvasProperties.width, canvasProperties.height);
         reDraw();
     }
 
-    window.onkeydown = function(event) {
-        if (event.keyCode == 46) { // delete key
-            p.checkPointsUndo.push(p.checkPoint);
-            p.checkPointsRedo = [];
-            if (clickedCurveIdx != undefined) {
-                let curve = (curves.splice(clickedCurveIdx, 1))[0];
+    // window.onkeydown = function(event) {
+    //     if (event.keyCode == 46) { // delete key
+    //         this.p.checkPointsUndo.push(p.checkPoint);
+    //         this.p.checkPointsRedo = [];
+    //         if (this.clickedCurveIdx != undefined) {
+    //             let curve = (this.curves.splice(this.clickedCurveIdx, 1))[0];
 
-                clickedCurveIdx = undefined;
-                reDraw();
-            }
-        }
-    }
+    //             this.clickedCurveIdx = undefined;
+    //             reDraw();
+    //         }
+    //     }
+    // }
 
     // equivalent to 'locally' refreshing the canvas
-    const reDraw = function() {
-        if (curves.length < 4) {
-            graphView.drawBackground(canvasProperties.width, canvasProperties.height);
-            graphView.drawCurves(curves);
-            graphView.drawStretchBox(clickedCurveIdx, curves);
-            scope.state = GraphUtils.encodeData(true, canvasProperties, curves);
+    reDraw = function() {
+        if (this.curves.length < 4) {
+            this.graphView.drawBackground(canvasProperties.width, canvasProperties.height);
+            this.graphView.drawCurves(this.curves);
+            this.graphView.drawStretchBox(this.clickedCurveIdx, this.curves);
+            scope.state = GraphUtils.encodeData(true, canvasProperties, this.curves);
         }
     };
 }
