@@ -1,27 +1,29 @@
 import * as graphUtils from './GraphUtils';
 
 // These should probably be class properties but the support is experimental and not enabled in Babel by default.
-let canvasHeight = window.innerHeight;
-let canvasWidth = window.innerWidth;
-
-const DOT_LINE_COLOR = [123];
-const DEFAULT_KNOT_COLOR = [77,77,77];
-
-const GRID_WIDTH = 60;
-const PADDING = 0.025 * canvasWidth;
-const DOT_LINE_STEP = 5;
-
-const CURVE_COLORS = [[93,165,218], [250,164,58], [96,189,104], [241,124,176], [241,88,84], [178,118,178]];
-const CURVE_STRKWEIGHT = 2;
-const KNOT_DETECT_COLOR = [0];
 
 // self explanatory drawing methods
 export default class GraphView {
 
+    canvasHeight = window.innerHeight;
+    canvasWidth = window.innerWidth;
+
+    DOT_LINE_COLOR = [123];
+    DEFAULT_KNOT_COLOR = [77,77,77];
+
+    GRID_WIDTH = 60;
+    DOT_LINE_STEP = 5;
+    PADDING;
+
+    CURVE_COLORS = [[93,165,218], [250,164,58], [96,189,104], [241,124,176], [241,88,84], [178,118,178]];
+    CURVE_STRKWEIGHT = 2;
+    KNOT_DETECT_COLOR = [0];
+
     constructor(p, width, height) {
         this.p = p;
-        canvasWidth = width;
-        canvasHeight = height;
+        this.canvasWidth = width;
+        this.canvasHeight = height;
+        this.PADDING = 0.025 * this.canvasWidth;
     }        
 
     drawCurves(curves, color) {
@@ -32,12 +34,12 @@ export default class GraphView {
 
     drawCurve(curve, color) {
         if (color == undefined) {
-            color = CURVE_COLORS[curve.colorIdx];
+            color = this.CURVE_COLORS[curve.colorIdx];
         }
 
         this.p.push();
         this.p.stroke(color);
-        this.p.strokeWeight(CURVE_STRKWEIGHT);
+        this.p.strokeWeight(this.CURVE_STRKWEIGHT);
 
         // want to connect closest points x,y wise, not just x wise
         let pts = curve.pts;
@@ -65,7 +67,7 @@ export default class GraphView {
 
     drawKnot(knot, color) {
         if (color == undefined) {
-            color = DEFAULT_KNOT_COLOR;
+            color = this.DEFAULT_KNOT_COLOR;
         }
         if (knot.symbol != undefined) {
             this.drawSymbol(knot.symbol);
@@ -84,7 +86,7 @@ export default class GraphView {
         if (typeof knot !==  "undefined") {
             this.p.push();
             this.p.noFill();
-            this.p.stroke(KNOT_DETECT_COLOR);
+            this.p.stroke(this.KNOT_DETECT_COLOR);
             this.p.strokeWeight(2);
             this.p.line(knot[0] - 5, knot[1] - 5, knot[0] + 5, knot[1] + 5);
             this.p.line(knot[0] + 5, knot[1] - 5, knot[0] - 5, knot[1] + 5);
@@ -93,7 +95,7 @@ export default class GraphView {
     }
 
     drawVerticalDotLine(x, begin, end) {
-        if (x < 0 || x > canvasWidth) {
+        if (x < 0 || x > this.canvasWidth) {
             return;
         }
 
@@ -104,10 +106,10 @@ export default class GraphView {
         }
 
         this.p.push();
-        this.p.stroke(DOT_LINE_COLOR);
-        this.p.strokeWeight(CURVE_STRKWEIGHT);
+        this.p.stroke(this.DOT_LINE_COLOR);
+        this.p.strokeWeight(this.CURVE_STRKWEIGHT);
 
-        let step = DOT_LINE_STEP;
+        let step = this.DOT_LINE_STEP;
         let toDraw = true;
         let y = begin;
         while (y + step < end) {
@@ -125,7 +127,7 @@ export default class GraphView {
     }
 
     drawHorizontalDotLine(y, begin, end) {
-        if (y < 0 || y > canvasHeight) {
+        if (y < 0 || y > this.canvasHeight) {
             return;
         }
 
@@ -136,10 +138,10 @@ export default class GraphView {
         }
 
         this.p.push();
-        this.p.stroke(DOT_LINE_COLOR);
-        this.p.strokeWeight(CURVE_STRKWEIGHT);
+        this.p.stroke(this.DOT_LINE_COLOR);
+        this.p.strokeWeight(this.CURVE_STRKWEIGHT);
 
-        let step = DOT_LINE_STEP;
+        let step = this.DOT_LINE_STEP;
         let toDraw = true;
         let x = begin;
         while (x + step < end) {
@@ -173,7 +175,7 @@ export default class GraphView {
         let maxY = curve.maxY;
 
         this.p.push();
-        this.p.stroke(DOT_LINE_COLOR);
+        this.p.stroke(this.DOT_LINE_COLOR);
         this.p.strokeWeight(0.5);
         this.p.line(minX, minY, maxX, minY);
         this.p.line(maxX, minY, maxX, maxY);
@@ -194,8 +196,8 @@ export default class GraphView {
 
     drawHorizontalAxis(curveStrokeWeight, passed_width, passed_height) {
         if (passed_width && passed_height) {
-            canvasHeight = passed_height;
-            canvasWidth = passed_width;
+            this.canvasHeight = passed_height;
+            this.canvasWidth = passed_width;
         }
         this.p.push();
 
@@ -204,15 +206,15 @@ export default class GraphView {
         this.p.stroke(0);
         this.p.noFill();
 
-        let leftMargin = PADDING;
-        let rightMargin = canvasWidth - PADDING;
+        let leftMargin = this.PADDING;
+        let rightMargin = this.canvasWidth - this.PADDING;
 
         this.p.beginShape();
-        this.p.vertex(leftMargin, canvasHeight/2);
-        this.p.vertex(rightMargin, canvasHeight / 2);
-        this.p.vertex(rightMargin - 10, canvasHeight / 2 - 5);
-        this.p.vertex(rightMargin, canvasHeight / 2);
-        this.p.vertex(rightMargin - 10, canvasHeight / 2 + 5);
+        this.p.vertex(leftMargin, this.canvasHeight/2);
+        this.p.vertex(rightMargin, this.canvasHeight / 2);
+        this.p.vertex(rightMargin - 10, this.canvasHeight / 2 - 5);
+        this.p.vertex(rightMargin, this.canvasHeight / 2);
+        this.p.vertex(rightMargin - 10, this.canvasHeight / 2 + 5);
         this.p.endShape();
 
         this.p.pop();
@@ -220,8 +222,8 @@ export default class GraphView {
 
     drawVerticalAxis(curveStrokeWeight, passed_width, passed_height) {
         if (passed_width && passed_height) {
-            canvasHeight = passed_height;
-            canvasWidth = passed_width;
+            this.canvasHeight = passed_height;
+            this.canvasWidth = passed_width;
         }
         this.p.push();
 
@@ -230,15 +232,15 @@ export default class GraphView {
         this.p.stroke(0);
         this.p.noFill();
 
-        let upMargin = PADDING;
-        let bottomMargin = canvasHeight - PADDING;
+        let upMargin = this.PADDING;
+        let bottomMargin = this.canvasHeight - this.PADDING;
 
         this.p.beginShape();
-        this.p.vertex(canvasWidth/2, bottomMargin);
-        this.p.vertex(canvasWidth/2, upMargin);
-        this.p.vertex(canvasWidth/2 - 5, upMargin + 10);
-        this.p.vertex(canvasWidth/2, upMargin);
-        this.p.vertex(canvasWidth/2 + 5, upMargin + 10);
+        this.p.vertex(this.canvasWidth/2, bottomMargin);
+        this.p.vertex(this.canvasWidth/2, upMargin);
+        this.p.vertex(this.canvasWidth/2 - 5, upMargin + 10);
+        this.p.vertex(this.canvasWidth/2, upMargin);
+        this.p.vertex(this.canvasWidth/2 + 5, upMargin + 10);
         this.p.endShape();
 
         this.p.pop();
@@ -246,8 +248,8 @@ export default class GraphView {
 
     drawGrid(curveStrokeWeight, passed_width, passed_height) {
         if (passed_width && passed_height) {
-            canvasHeight = passed_height;
-            canvasWidth = passed_width;
+            this.canvasHeight = passed_height;
+            this.canvasWidth = passed_width;
         }
         this.p.push();
 
@@ -257,20 +259,20 @@ export default class GraphView {
         this.p.stroke(240);
 
         this.p.push();
-        this.p.translate(0, canvasHeight / 2);
-        let num = canvasHeight / (GRID_WIDTH * 2);
+        this.p.translate(0, this.canvasHeight / 2);
+        let num = this.canvasHeight / (this.GRID_WIDTH * 2);
         for (let i = 0; i < num; i++) {
-            this.p.line(0, -i*GRID_WIDTH, canvasWidth, -i*GRID_WIDTH);
-            this.p.line(0, i*GRID_WIDTH, canvasWidth, i*GRID_WIDTH);
+            this.p.line(0, -i*this.GRID_WIDTH, this.canvasWidth, -i*this.GRID_WIDTH);
+            this.p.line(0, i*this.GRID_WIDTH, this.canvasWidth, i*this.GRID_WIDTH);
         }
         this.p.pop();
 
         this.p.push();
-        this.p.translate(canvasWidth / 2, 0);
-        num = canvasWidth / (GRID_WIDTH * 2);
+        this.p.translate(this.canvasWidth / 2, 0);
+        num = this.canvasWidth / (this.GRID_WIDTH * 2);
         for (let i = 0; i < num; i++) {
-            this.p.line(-i*GRID_WIDTH, 0, -i*GRID_WIDTH, canvasHeight);
-            this.p.line(i*GRID_WIDTH, 0, i*GRID_WIDTH, canvasHeight);
+            this.p.line(-i*this.GRID_WIDTH, 0, -i*this.GRID_WIDTH, this.canvasHeight);
+            this.p.line(i*this.GRID_WIDTH, 0, i*this.GRID_WIDTH, this.canvasHeight);
         }
         this.p.pop();
 
@@ -285,9 +287,9 @@ export default class GraphView {
         this.p.strokeWeight(0.5);
         this.p.fill(0);
 
-        this.p.text("O", canvasWidth/2 - 15, canvasHeight/2 + 15);
-        this.p.text("x", canvasWidth - PADDING, canvasHeight/2 + 15);
-        this.p.text("y", canvasWidth/2 + 5, PADDING);
+        this.p.text("O", this.canvasWidth/2 - 15, this.canvasHeight/2 + 15);
+        this.p.text("x", this.canvasWidth - this.PADDING, this.canvasHeight/2 + 15);
+        this.p.text("y", this.canvasWidth/2 + 5, this.PADDING);
 
         this.p.pop();
     }
@@ -296,15 +298,15 @@ export default class GraphView {
         this.p.clear();
         this.p.background(255);
 
-        this.drawGrid(CURVE_STRKWEIGHT, passed_width, passed_height);
-        this.drawHorizontalAxis(CURVE_STRKWEIGHT, passed_width, passed_height);
-        this.drawVerticalAxis(CURVE_STRKWEIGHT, passed_width, passed_height);
+        this.drawGrid(this.CURVE_STRKWEIGHT, passed_width, passed_height);
+        this.drawHorizontalAxis(this.CURVE_STRKWEIGHT, passed_width, passed_height);
+        this.drawVerticalAxis(this.CURVE_STRKWEIGHT, passed_width, passed_height);
         this.drawLabel();
     }
 
     drawCorner(stretchMode, c) {
         this.p.push();
-        this.p.fill(KNOT_DETECT_COLOR);
+        this.p.fill(this.KNOT_DETECT_COLOR);
         switch (stretchMode) {
             case "bottomLeft": {
                 this.p.rect(c.minX - 4, c.minY - 4, 8, 8);

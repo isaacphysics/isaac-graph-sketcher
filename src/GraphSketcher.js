@@ -54,17 +54,20 @@ const s = (p, _width, _height) => {
 
     let scope = {};
     let canvas;
+    let elements = [];
+    let colorSelect;
 
     function isOverButton(pt, button) {
-        if (button.position() == undefined) {
-            return false;
-        }
+        const rect = button.getBoundingClientRect();
 
-        let left = button.position().left;
-        let top = button.position().top;
-        let width = button.width();
-        let height = button.height();
-        return (pt[0] > left && pt[0] < left + width && pt[1] > top && pt[1] < top + height);
+        if (rect) {
+            let left = rect.left;
+            let top = rect.top;
+            let width = rect.width;
+            let height = rect.height;
+            return (pt[0] > left && pt[0] < left + width && pt[1] > top && pt[1] < top + height);
+        }
+        return false;
     }
 
     // Mouse is inactive if over buttons - stops curves being drawn where they can't be seen
@@ -73,15 +76,6 @@ const s = (p, _width, _height) => {
         if (!(pt[0] > 0 && pt[0] < canvasProperties.width && pt[1] > 0 && pt[1] < canvasProperties.height)) {
             return false;
         }
-
-        let elements = [];
-        elements.push(document.getElementById("graph-sketcher-ui-redo"));
-        elements.push(document.getElementById("graph-sketcher-ui-undo"));
-        elements.push(document.getElementById("graph-sketcher-ui-poly"));
-        elements.push(document.getElementById("graph-sketcher-ui-straight"));
-        elements.push(document.getElementById("graph-sketcher-ui-trash-button"));
-        elements.push(document.getElementById("graph-sketcher-ui-submit"));
-        elements.push(document.getElementById("graph-sketcher-ui-color-select"));
 
         for (let i = 0; i < elements.length; i++) {
             if (isOverButton(pt, elements[i])) {
@@ -95,6 +89,15 @@ const s = (p, _width, _height) => {
     // run in the beginning by p5 library
     p.setup = function() {
         canvas = p.createCanvas(canvasProperties.width, canvasProperties.height);
+        elements.push(document.getElementById("graph-sketcher-ui-redo"));
+        elements.push(document.getElementById("graph-sketcher-ui-undo"));
+        elements.push(document.getElementById("graph-sketcher-ui-poly"));
+        elements.push(document.getElementById("graph-sketcher-ui-straight"));
+        elements.push(document.getElementById("graph-sketcher-ui-trash-button"));
+        elements.push(document.getElementById("graph-sketcher-ui-submit"));
+        colorSelect = document.getElementById("graph-sketcher-ui-color-select");
+        elements.push(colorSelect);
+
         p.noLoop();
         p.cursor(p.ARROW);
         reDraw();
