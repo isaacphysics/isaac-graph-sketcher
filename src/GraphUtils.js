@@ -1,3 +1,5 @@
+// @ts-nocheck
+
 const SAMPLE_INTERVAL = 10;
 const numOfPts = 100;
 
@@ -192,7 +194,7 @@ export function detect(e, x, y) {
 export function getMousePt(e) {
     let x = (e.clientX - 5);
     let y = (e.clientY - 5);
-    return (this.createPoint(x, y));
+    return this.createPoint(x, y);
 };
 
 export function createPoint(x, y) {

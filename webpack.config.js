@@ -2,7 +2,7 @@ const path = require('path');
 const DashboardPlugin = require('webpack-dashboard/plugin');
 
 module.exports = (_env, argv) => { return {
-  entry: './src/GraphSketcher.js',
+  entry: './src/GraphSketcher.ts',
   devtool: argv.mode === 'development' ? 'source-map' : false,
   optimization: {
     usedExports: true,
@@ -14,7 +14,12 @@ module.exports = (_env, argv) => { return {
     rules: [
       {
         test: /\.jsx?$/,
-        use: [{ loader: 'babel-loader', options: { presets: ['@babel/preset-env'], plugins: ["@babel/plugin-proposal-class-properties"]}}],
+        use: [{ loader: 'babel-loader', options: { presets: ['@babel/preset-env'], plugins: ["@babel/plugin-proposal-class-properties", "@babel/plugin-transform-typescript"]}}],
+        exclude: /node_modules/
+      },
+      {
+        test: /\.tsx?$/,
+        use: [{ loader: 'babel-loader', options: { presets: ['@babel/preset-env'] } }, 'ts-loader'],
         exclude: /node_modules/
       },
       {
