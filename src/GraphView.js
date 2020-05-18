@@ -26,7 +26,7 @@ export default class GraphView {
         this.PADDING = 0.025 * this.canvasWidth;
     }        
 
-    drawCurves(curves, color) {
+    drawCurves(curves, color = -1) {
         for (let i = 0; i < curves.length; i++) {
             this.drawCurve(curves[i], color);
         }

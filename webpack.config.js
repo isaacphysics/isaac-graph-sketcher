@@ -14,12 +14,34 @@ module.exports = (_env, argv) => { return {
     rules: [
       {
         test: /\.jsx?$/,
-        use: [{ loader: 'babel-loader', options: { presets: ['@babel/preset-env'], plugins: ["@babel/plugin-proposal-class-properties", "@babel/plugin-transform-typescript"]}}],
+        use: [
+          { loader: 'babel-loader',
+            options: {
+              presets: ['@babel/preset-env'],
+              plugins: [
+                "@babel/plugin-transform-typescript",
+                "@babel/plugin-proposal-class-properties",
+                "@babel/plugin-transform-classes"
+              ]
+            }
+          }
+        ],
         exclude: /node_modules/
       },
       {
         test: /\.tsx?$/,
-        use: [{ loader: 'babel-loader', options: { presets: ['@babel/preset-env'] } }, 'ts-loader'],
+        use: [
+          { loader: 'babel-loader',
+            options: {
+              presets: ['@babel/preset-env'],
+              plugins: [
+                "@babel/plugin-proposal-class-properties",
+                "@babel/plugin-transform-classes"
+              ]
+            }
+          },
+          { loader: 'ts-loader' }
+        ],
         exclude: /node_modules/
       },
       {

@@ -3,23 +3,24 @@ import GraphView from './GraphView';
 import * as GraphUtils from './GraphUtils';
 
 // TODO: Make this an actual point
-type Point = number[];
-interface Curve {
-    pts: Point[];
-    minX: number;
-    maxX: number;
-    minY: number;
-    maxY: number;
-    endPt: Point;
-    interX: Point[];
-    interY: Point[];
-    maxima: Point[];
-    minima: Point[];
-    colorIdx: number;
+export type Point = number[];
+export class Curve {
+    pts: Point[] = [];
+    minX: number = 0;
+    maxX: number = 0;
+    minY: number = 0;
+    maxY: number = 0;
+    endPt: Point = [0,0];
+    interX: Point[] = [];
+    interY: Point[] = [];
+    maxima: Point[] = [];
+    minima: Point[] = [];
+    colorIdx: number = -1;
 };
 
 enum Action {
     // TODO: Check that this needs to be a string enum
+    NO_ACTION = "NO_ACTION",
     STRETCH_CURVE = "STRETCH_CURVE",
     STRETCH_POINT = "STRETCH_POINT",
     MOVE_CURVE = "MOVE_CURVE",
@@ -42,40 +43,39 @@ export class GraphSketcher {
     private DEFAULT_KNOT_COLOR = [77,77,77];
 
     // action recorder
-    private action: Action;
-    private isMouseDragged: boolean;
-    private releasePt: Point;
+    private action: Action = Action.NO_ACTION;
+    private isMouseDragged?: boolean = false ;
+    private releasePt: Point = [0,0];
 
     // for drawing curve
-    private drawnPts = [];
-    private drawnColorIdx: number;
+    private drawnPts: Point[] = [];
+    private drawnColorIdx: number = -1;
     
-    private prevMousePt: Point;
+    private prevMousePt: Point = [0,0];
 
     // fving and stretching curve
-    private movedCurveIdx: number;
-    private stretchMode;
-    private isMaxima: boolean;
+    private movedCurveIdx?: number;
+    private stretchMode?: string;
+    private isMaxima?: boolean;
 
     // fving symbols
-    private movedSymbol;
-    private bindedKnot;
-    private symbolType;
+    private movedSymbol?: null; // TODO: WTF is this?
+    private bindedKnot?: { [x: string]: any; };
+    private symbolType?: string;
 
     private curves: Curve[] = [];
     private clickedKnot: any;
-    private clickedKnotId: number;
-    private clickedCurve: number;
-    private clickedCurveIdx: number;
+    private clickedKnotId?: number;
+    private clickedCurve?: number;
+    private clickedCurveIdx?: number;
 
     private scope: any = {};
-    private canvas: p5.Renderer;
-    private elements = [];
-    private colorSelect: HTMLSelectElement;
+    private canvas?: p5.Renderer;
+    private elements: HTMLElement[] = [];
+    private colorSelect?: HTMLSelectElement;
 
     constructor(p: p5, width: number, height: number) {
         this.p = p;
-        this.p.setup = this.setup;
 
         this.p.touchStarted = this.touchStarted;
         this.p.mousePressed = this.mousePressed;
@@ -86,21 +86,22 @@ export class GraphSketcher {
         this.p.mouseReleased = this.mouseReleased;
 
         this.p.windowResized = this.windowResized;
-        // TODO: Assign the rest of the functions
+
+        this.p.setup = this.setup;
 
         this.canvasProperties = { width, height };
         this.graphView = new GraphView(p, width, height);
     }
 
     // run in the beginning by p5 library
-    setup() {
+    setup = () => {
         this.canvas = this.p.createCanvas(this.canvasProperties.width, this.canvasProperties.height);
-        this.elements.push(document.getElementById("graph-sketcher-ui-redo"));
-        this.elements.push(document.getElementById("graph-sketcher-ui-undo"));
-        this.elements.push(document.getElementById("graph-sketcher-ui-poly"));
-        this.elements.push(document.getElementById("graph-sketcher-ui-straight"));
-        this.elements.push(document.getElementById("graph-sketcher-ui-trash-button"));
-        this.elements.push(document.getElementById("graph-sketcher-ui-submit"));
+        this.elements.push(document.getElementById("graph-sketcher-ui-redo") as HTMLElement);
+        this.elements.push(document.getElementById("graph-sketcher-ui-undo") as HTMLElement);
+        this.elements.push(document.getElementById("graph-sketcher-ui-poly") as HTMLElement);
+        this.elements.push(document.getElementById("graph-sketcher-ui-straight") as HTMLElement);
+        this.elements.push(document.getElementById("graph-sketcher-ui-trash-button") as HTMLElement);
+        this.elements.push(document.getElementById("graph-sketcher-ui-submit") as HTMLElement);
         this.colorSelect = document.getElementById("graph-sketcher-ui-color-select") as HTMLSelectElement;
         this.elements.push(this.colorSelect);
 
@@ -110,7 +111,7 @@ export class GraphSketcher {
     }
 
 
-    isOverButton(pt: Point, button: HTMLElement) {
+    isOverButton = (pt: Point, button: HTMLElement) => {
         const rect = button.getBoundingClientRect();
 
         if (rect) {
@@ -124,7 +125,7 @@ export class GraphSketcher {
     }
 
     // Mouse is inactive if over buttons - stops curves being drawn where they can't be seen
-    isActive(pt: Point) {
+    isActive = (pt: Point) => {
 
         if (!(pt[0] > 0 && pt[0] < this.canvasProperties.width && pt[1] > 0 && pt[1] < this.canvasProperties.height)) {
             return false;
@@ -140,7 +141,7 @@ export class GraphSketcher {
     }
 
     // Check if movement to new position is over an actionable object, so can render appropriately
-    mouseMoved(e: MouseEvent) {
+    mouseMoved = (e: MouseEvent) => {
         let mousePosition: Point = GraphUtils.getMousePt(e);
 
         function detect(x: number, y: number) {
@@ -214,22 +215,22 @@ export class GraphSketcher {
     }
 
     // Determines type of action when clicking on something within the canvas
-    mousePressed(e: MouseEvent) {
+    mousePressed = (e: MouseEvent) => {
 
         this.isMouseDragged = false;
-        this.action = null;
+        // this.action = undefined;
 
-        this.movedSymbol = null;
-        this.bindedKnot = null;
-        this.symbolType = null;
+        this.movedSymbol = undefined;
+        this.bindedKnot = undefined;
+        this.symbolType = undefined;
 
         this.drawnPts = [];
-        this.drawnColorIdx = null;
+        // this.drawnColorIdx = undefined;
 
-        this.movedCurveIdx = null;
-        this.prevMousePt = null;
+        this.movedCurveIdx = undefined;
+        // this.prevMousePt = undefined;
 
-        this.releasePt = null;
+        // this.releasePt = undefined;
 
 
         let mousePosition = GraphUtils.getMousePt(e);
@@ -240,7 +241,7 @@ export class GraphSketcher {
             return;
         }
 
-        function detect(x, y) {
+        function detect(x: number, y: number) {
             return (Math.abs(mousePosition[0] - x) < 5 && Math.abs(mousePosition[1] - y) < 5);
         }
         // record down mousePosition status, may be used later for undo.
@@ -310,7 +311,7 @@ export class GraphSketcher {
                     }
                 }
             }
-            let tc: Curve;
+            let tc: Curve|null = null;
             for (let i = 0; i < this.curves.length; i++) {
                 for (let j = 0; j < this.curves[i].pts.length; j++) {
                     if (GraphUtils.getDist(mousePosition, this.curves[i].pts[j]) < this.MOUSE_DETECT_RADIUS) {
@@ -320,7 +321,7 @@ export class GraphSketcher {
                     }
                 }
             }
-            if (tc != null) {
+            if (tc) {
                 if (mousePosition[0] >= tc.minX && mousePosition[0] <= tc.maxX && mousePosition[1] >= tc.minY && mousePosition[1] <= tc.maxY) {
                     this.movedCurveIdx = this.clickedCurveIdx;
                     this.action = Action.MOVE_CURVE;
@@ -337,13 +338,13 @@ export class GraphSketcher {
 
 
         if (this.clickedCurveIdx != null || this.clickedKnot != null) {
-            this.clickedCurveIdx = null;
+            this.clickedCurveIdx = undefined;
             this.clickedKnot = null;
             this.reDraw();
         }
 
         // get drawnColor
-        switch (this.colorSelect.value) {
+        switch (this.colorSelect?.value) {
             case "Blue": {
                 this.drawnColorIdx = 0;
                 break;
@@ -356,20 +357,23 @@ export class GraphSketcher {
                 this.drawnColorIdx = 2;
                 break;
             }
+            default:
+                this.drawnColorIdx = 0;
+                break;
         }
         return;
     }
 
     // Keep actions for curve manipulation together
-    mouseDragged(e: MouseEvent) {
+    mouseDragged = (e: MouseEvent) => {
         this.isMouseDragged = true;
         let mousePosition = GraphUtils.getMousePt(e);
         this.releasePt = mousePosition;
 
-        if (this.action == Action.STRETCH_POINT) {
+        if (this.action == Action.STRETCH_POINT && this.clickedCurve) {
             let selectedCurve = this.curves[this.clickedCurve];
             // we need to know the (important) ordered end and turning points
-            let importantPoints = [];
+            let importantPoints: any[] = [];
             if (selectedCurve.pts[0][0] > selectedCurve.pts[selectedCurve.pts.length - 1][0]) {
                 selectedCurve.pts.reverse();
             }
@@ -389,7 +393,7 @@ export class GraphSketcher {
             this.reDraw();
             this.prevMousePt = mousePosition;
 
-        } else if (this.action == Action.MOVE_CURVE) {
+        } else if (this.action == Action.MOVE_CURVE && this.movedCurveIdx) {
             this.p.cursor(this.p.MOVE);
 
             // scope.trashActive = isOverButton(mousePosition, element.find(".trash-button"));
@@ -400,7 +404,7 @@ export class GraphSketcher {
             GraphUtils.translateCurve(this.curves[this.movedCurveIdx], dx, dy, this.canvasProperties);
             this.reDraw();
 
-        } else if (this.action == Action.STRETCH_CURVE) {
+        } else if (this.action == Action.STRETCH_CURVE && this.clickedCurveIdx) {
             this.p.cursor(this.p.MOVE);
 
             let dx = mousePosition[0] - this.prevMousePt[0];
@@ -521,7 +525,7 @@ export class GraphSketcher {
             this.reDraw();
             this.graphView.drawCorner(this.stretchMode, currentCurve);
 
-        } else if (this.action == Action.DRAW_CURVE) {
+        } else if (this.action == Action.DRAW_CURVE && this.drawnColorIdx >= 0) {
             this.p.cursor(this.p.CROSS);
             if (this.curves.length < this.CURVE_LIMIT) {
                 this.p.push();
@@ -538,7 +542,7 @@ export class GraphSketcher {
     }
 
     // Need to know where to update points to - gives final position
-    mouseReleased(_e: MouseEvent) {
+    mouseReleased = (_e: MouseEvent) => {
         let mousePosition = this.releasePt;
 
         // if it is just a click, handle click in the following if block
@@ -549,7 +553,7 @@ export class GraphSketcher {
                 if (this.bindedKnot == null) {
                     // this.freeSymbols.push(this.movedSymbol);
                 } else {
-                    this.bindedKnot[this.symbolType] = this.movedSymbol;
+                    this.bindedKnot[this.symbolType || ''] = this.movedSymbol;
                 }
                 this.reDraw();
 
@@ -578,7 +582,7 @@ export class GraphSketcher {
 
             if (this.clickedKnot != null || this.clickedCurveIdx != null) {
                 this.clickedKnot = null;
-                this.clickedCurveIdx = null;
+                this.clickedCurveIdx = undefined;
                 this.reDraw();
             }
 
@@ -617,7 +621,7 @@ export class GraphSketcher {
 
             if (this.curves.length < this.CURVE_LIMIT){
 
-                let curve: Curve;
+                let curve = new Curve();
 
                 if (GraphUtils.sample(this.drawnPts).length < 3) {
                     return;
@@ -686,19 +690,19 @@ export class GraphSketcher {
     }
 
     // Would like to be used on touch screen devices, this simply facilitates it
-    touchStarted(e: TouchEvent) {
+    touchStarted = (e: TouchEvent) => {
         this.p.mousePressed(e.touches[0]);
     }
 
-    touchMoved(e: TouchEvent) {
+    touchMoved = (e: TouchEvent) => {
         this.p.mouseDragged(e.touches[0]);
     }
 
-    touchEnded(e: TouchEvent) {
+    touchEnded = (e: TouchEvent) => {
         this.p.mouseReleased(e);
     }
 
-    windowResized() {
+    windowResized = () => {
         let data = GraphUtils.encodeData(false, this.canvasProperties, this.curves);
         this.canvasProperties.width = window.innerWidth;
         this.canvasProperties.height = window.innerHeight;
@@ -722,7 +726,7 @@ export class GraphSketcher {
     // }
 
     // equivalent to 'locally' refreshing the canvas
-    reDraw() {
+    reDraw = () => {
         if (this.curves.length < 4) {
             this.graphView.drawBackground(this.canvasProperties.width, this.canvasProperties.height);
             this.graphView.drawCurves(this.curves);
@@ -732,8 +736,8 @@ export class GraphSketcher {
     };
 }
 
-export function makeGraphSketcher(element, width, height) {
-    let sketch: GraphSketcher;
+export function makeGraphSketcher(element: HTMLElement | undefined, width: number, height: number) {
+    let sketch: GraphSketcher|null = null;
     let p = new p5(instance => {
         sketch = new GraphSketcher(instance, width, height);
         return sketch;
