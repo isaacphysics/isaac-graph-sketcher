@@ -28,6 +28,11 @@ enum Action {
     MOVE_SYMBOL = "MOVE_SYMBOL"
 };
 
+export enum LineType {
+    BEZIER,
+    LINEAR
+};
+
 export class GraphSketcher {
     private p: p5;
     private canvasProperties: { width: number, height: number };
@@ -73,6 +78,10 @@ export class GraphSketcher {
     private canvas?: p5.Renderer;
     private elements: HTMLElement[] = [];
     private colorSelect?: HTMLSelectElement;
+
+    // The following public members can be modified from the outside
+    public selectedLineType = LineType.BEZIER;
+    public updateGraphSketcherState?: (state: { canvasWidth: number; canvasHeight: number; curves: Curve[] }) => void;
 
     constructor(p: p5, width: number, height: number) {
         this.p = p;
@@ -646,9 +655,9 @@ export class GraphSketcher {
                 }
 
                 let pts = [];
-                if (this.scope.selectedLineType == "bezier") {
+                if (this.selectedLineType === LineType.BEZIER) {
                     pts = GraphUtils.bezierLineStyle(GraphUtils.sample(this.drawnPts));
-                } else if (this.scope.selectedLineType == "linear") {
+                } else if (this.selectedLineType === LineType.LINEAR) {
                     pts = GraphUtils.linearLineStyle([this.drawnPts[0],this.drawnPts[this.drawnPts.length-1]])
                 }
 
@@ -672,7 +681,7 @@ export class GraphSketcher {
                 curve.endPt = GraphUtils.findEndPts(pts);
                 curve.interX = GraphUtils.findInterceptX(this.canvasProperties.height, pts);
                 curve.interY = GraphUtils.findInterceptY(this.canvasProperties.width, pts);
-                if (this.scope.selectedLineType == "bezier") {
+                if (this.selectedLineType === LineType.BEZIER) {
                     curve.maxima = GraphUtils.findTurnPts(pts, 'maxima');
                     curve.minima = GraphUtils.findTurnPts(pts, 'minima');
                 } else {
@@ -731,7 +740,12 @@ export class GraphSketcher {
             this.graphView.drawBackground(this.canvasProperties.width, this.canvasProperties.height);
             this.graphView.drawCurves(this.curves);
             this.graphView.drawStretchBox(this.clickedCurveIdx, this.curves);
-            // this.scope.state = GraphUtils.encodeData(true, this.canvasProperties, this.curves);
+            if (this.updateGraphSketcherState) {
+                const newState = GraphUtils.encodeData(true, this.canvasProperties, this.curves);
+                if (newState) {
+                    this.updateGraphSketcherState(newState);
+                }
+            }
         }
     };
 }
