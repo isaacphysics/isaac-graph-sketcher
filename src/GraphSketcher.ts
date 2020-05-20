@@ -94,7 +94,7 @@ export class GraphSketcher {
     }
 
     // run in the beginning by p5 library
-    setup = () => {
+    private setup = () => {
         this.canvas = this.p.createCanvas(this.canvasProperties.width, this.canvasProperties.height);
         this.elements.push(document.getElementById("graph-sketcher-ui-redo") as HTMLElement);
         this.elements.push(document.getElementById("graph-sketcher-ui-undo") as HTMLElement);
@@ -111,7 +111,7 @@ export class GraphSketcher {
     }
 
 
-    isOverButton = (pt: Point, button: HTMLElement) => {
+    private isOverButton = (pt: Point, button: HTMLElement) => {
         const rect = button.getBoundingClientRect();
 
         if (rect) {
@@ -125,7 +125,7 @@ export class GraphSketcher {
     }
 
     // Mouse is inactive if over buttons - stops curves being drawn where they can't be seen
-    isActive = (pt: Point) => {
+    private isActive = (pt: Point) => {
 
         if (!(pt[0] > 0 && pt[0] < this.canvasProperties.width && pt[1] > 0 && pt[1] < this.canvasProperties.height)) {
             return false;
@@ -141,7 +141,7 @@ export class GraphSketcher {
     }
 
     // Check if movement to new position is over an actionable object, so can render appropriately
-    mouseMoved = (e: MouseEvent) => {
+    private mouseMoved = (e: MouseEvent) => {
         let mousePosition: Point = GraphUtils.getMousePt(e);
 
         function detect(x: number, y: number) {
@@ -215,7 +215,7 @@ export class GraphSketcher {
     }
 
     // Determines type of action when clicking on something within the canvas
-    mousePressed = (e: MouseEvent) => {
+    private mousePressed = (e: MouseEvent) => {
 
         this.isMouseDragged = false;
         // this.action = undefined;
@@ -365,7 +365,7 @@ export class GraphSketcher {
     }
 
     // Keep actions for curve manipulation together
-    mouseDragged = (e: MouseEvent) => {
+    private mouseDragged = (e: MouseEvent) => {
         this.isMouseDragged = true;
         let mousePosition = GraphUtils.getMousePt(e);
         this.releasePt = mousePosition;
@@ -542,7 +542,7 @@ export class GraphSketcher {
     }
 
     // Need to know where to update points to - gives final position
-    mouseReleased = (_e: MouseEvent) => {
+    private mouseReleased = (_e: MouseEvent) => {
         let mousePosition = this.releasePt;
 
         // if it is just a click, handle click in the following if block
@@ -690,19 +690,19 @@ export class GraphSketcher {
     }
 
     // Would like to be used on touch screen devices, this simply facilitates it
-    touchStarted = (e: TouchEvent) => {
+    private touchStarted = (e: TouchEvent) => {
         this.p.mousePressed(e.touches[0]);
     }
 
-    touchMoved = (e: TouchEvent) => {
+    private touchMoved = (e: TouchEvent) => {
         this.p.mouseDragged(e.touches[0]);
     }
 
-    touchEnded = (e: TouchEvent) => {
+    private touchEnded = (e: TouchEvent) => {
         this.p.mouseReleased(e);
     }
 
-    windowResized = () => {
+    private windowResized = () => {
         let data = GraphUtils.encodeData(false, this.canvasProperties, this.curves);
         this.canvasProperties.width = window.innerWidth;
         this.canvasProperties.height = window.innerHeight;
@@ -726,7 +726,7 @@ export class GraphSketcher {
     // }
 
     // equivalent to 'locally' refreshing the canvas
-    reDraw = () => {
+    private reDraw = () => {
         if (this.curves.length < 4) {
             this.graphView.drawBackground(this.canvasProperties.width, this.canvasProperties.height);
             this.graphView.drawCurves(this.curves);
@@ -736,8 +736,8 @@ export class GraphSketcher {
     };
 }
 
-export function makeGraphSketcher(element: HTMLElement | undefined, width: number, height: number) {
-    let sketch: GraphSketcher|null = null;
+export function makeGraphSketcher(element: HTMLElement | undefined, width: number, height: number): { sketch?: GraphSketcher, p: p5 } {
+    let sketch: GraphSketcher | undefined;
     let p = new p5(instance => {
         sketch = new GraphSketcher(instance, width, height);
         return sketch;
