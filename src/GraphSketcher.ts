@@ -42,10 +42,8 @@ export class GraphSketcher {
     private checkPointsUndo: any[] = [];
     private checkPointsRedo: any[] = [];
 
-    private MOVE_SYMBOL_COLOR = [151];
     private CURVE_LIMIT = 3;
     private MOUSE_DETECT_RADIUS = 10;
-    private DEFAULT_KNOT_COLOR = [77,77,77];
 
     // action recorder
     private action: Action = Action.NO_ACTION;
@@ -69,12 +67,12 @@ export class GraphSketcher {
     private symbolType?: string;
 
     private curves: Curve[] = [];
-    private clickedKnot: any;
+    private clickedKnot?: number;
     private clickedKnotId?: number;
     private clickedCurve?: number;
     private clickedCurveIdx?: number;
 
-    private scope: any = {};
+    // private scope: any = {};
     private canvas?: p5.Renderer;
     private elements: HTMLElement[] = [];
     private colorSelect?: HTMLSelectElement;
@@ -227,20 +225,17 @@ export class GraphSketcher {
     private mousePressed = (e: MouseEvent) => {
 
         this.isMouseDragged = false;
-        // this.action = undefined;
+        this.action = Action.NO_ACTION;
 
         this.movedSymbol = undefined;
         this.bindedKnot = undefined;
         this.symbolType = undefined;
 
         this.drawnPts = [];
-        // this.drawnColorIdx = undefined;
+        this.drawnColorIdx = -1;
 
         this.movedCurveIdx = undefined;
-        // this.prevMousePt = undefined;
-
-        // this.releasePt = undefined;
-
+        this.prevMousePt = [0,0];
 
         let mousePosition = GraphUtils.getMousePt(e);
         this.releasePt = mousePosition;
@@ -260,7 +255,7 @@ export class GraphSketcher {
         // let found = false;
 
         // check if stretching curve
-        if (this.clickedCurveIdx != null) {
+        if (this.clickedCurveIdx) {
             let c = this.curves[this.clickedCurveIdx];
 
             if (detect(c.minX, c.minY) || detect(c.maxX, c.minY) || detect(c.minX, c.maxY) || detect(c.maxX, c.maxY)
@@ -287,13 +282,13 @@ export class GraphSketcher {
 
 
                 this.action = Action.STRETCH_CURVE;
-                this.clickedKnot = null;
+                this.clickedKnot = undefined;
                 this.prevMousePt = mousePosition;
                 return;
             }
         }
 
-        if (this.curves != []) {
+        if (this.curves.length > 0) {
             for (let i = 0; i < this.curves.length; i++) {
                 let maxima = this.curves[i].maxima;
                 let minima = this.curves[i].minima;
@@ -334,7 +329,7 @@ export class GraphSketcher {
                 if (mousePosition[0] >= tc.minX && mousePosition[0] <= tc.maxX && mousePosition[1] >= tc.minY && mousePosition[1] <= tc.maxY) {
                     this.movedCurveIdx = this.clickedCurveIdx;
                     this.action = Action.MOVE_CURVE;
-                    this.clickedKnot = null;
+                    this.clickedKnot = undefined;
                     this.prevMousePt = mousePosition;
                     return;
                 }
@@ -346,9 +341,9 @@ export class GraphSketcher {
         }
 
 
-        if (this.clickedCurveIdx != null || this.clickedKnot != null) {
+        if (this.clickedCurveIdx || this.clickedKnot) {
             this.clickedCurveIdx = undefined;
-            this.clickedKnot = null;
+            this.clickedKnot = undefined;
             this.reDraw();
         }
 
@@ -589,8 +584,8 @@ export class GraphSketcher {
             }
 
 
-            if (this.clickedKnot != null || this.clickedCurveIdx != null) {
-                this.clickedKnot = null;
+            if (this.clickedKnot || this.clickedCurveIdx) {
+                this.clickedKnot = undefined;
                 this.clickedCurveIdx = undefined;
                 this.reDraw();
             }

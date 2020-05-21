@@ -33,7 +33,7 @@ export default class GraphView {
     }
 
     drawCurve(curve, color) {
-        if (color == undefined) {
+        if (color < 0) {
             color = this.CURVE_COLORS[curve.colorIdx];
         }
 
