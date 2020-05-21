@@ -2,6 +2,12 @@ import p5 from 'p5';
 import GraphView from './GraphView';
 import * as GraphUtils from './GraphUtils';
 
+// undefined|null checker and type guard all-in-wonder.
+// Why is this not in Typescript?
+function isDefined<T>(stuff: T): stuff is NonNullable<T> {
+    return stuff !== undefined && stuff !== null
+}
+
 // TODO: Make this an actual point
 export type Point = number[];
 export class Curve {
@@ -39,15 +45,15 @@ export class GraphSketcher {
     private graphView: GraphView;
 
     private checkPoint: any;
-    private checkPointsUndo: any[] = [];
-    private checkPointsRedo: any[] = [];
+    public  checkPointsUndo: any[] = [];
+    public  checkPointsRedo: any[] = [];
 
     private CURVE_LIMIT = 3;
     private MOUSE_DETECT_RADIUS = 10;
 
     // action recorder
     private action: Action = Action.NO_ACTION;
-    private isMouseDragged?: boolean = false ;
+    private isMouseDragged: boolean = false ;
     private releasePt: Point = [0,0];
 
     // for drawing curve
@@ -103,12 +109,12 @@ export class GraphSketcher {
     // run in the beginning by p5 library
     private setup = () => {
         this.canvas = this.p.createCanvas(this.canvasProperties.width, this.canvasProperties.height);
-        this.elements.push(document.getElementById("graph-sketcher-ui-redo") as HTMLElement);
-        this.elements.push(document.getElementById("graph-sketcher-ui-undo") as HTMLElement);
-        this.elements.push(document.getElementById("graph-sketcher-ui-poly") as HTMLElement);
-        this.elements.push(document.getElementById("graph-sketcher-ui-straight") as HTMLElement);
+        this.elements.push(document.getElementById("graph-sketcher-ui-redo-button") as HTMLElement);
+        this.elements.push(document.getElementById("graph-sketcher-ui-undo-button") as HTMLElement);
+        this.elements.push(document.getElementById("graph-sketcher-ui-bezier-button") as HTMLElement);
+        this.elements.push(document.getElementById("graph-sketcher-ui-linear-button") as HTMLElement);
         this.elements.push(document.getElementById("graph-sketcher-ui-trash-button") as HTMLElement);
-        this.elements.push(document.getElementById("graph-sketcher-ui-submit") as HTMLElement);
+        this.elements.push(document.getElementById("graph-sketcher-ui-submit-button") as HTMLElement);
         this.colorSelect = document.getElementById("graph-sketcher-ui-color-select") as HTMLSelectElement;
         this.elements.push(this.colorSelect);
 
@@ -147,6 +153,51 @@ export class GraphSketcher {
         return true;
     }
 
+    // undo-ing, record history
+    public undo = () => {
+        if (this.checkPointsUndo.length === 0 || !isDefined(this.checkPointsUndo)) {
+            return;
+        }
+
+        let checkPointRedo: { curvesJSON?: string } = {};
+        checkPointRedo.curvesJSON = JSON.stringify(this.curves);
+        this.checkPointsRedo.push(checkPointRedo);
+
+        let checkPointUndo = this.checkPointsUndo.pop();
+        this.curves = JSON.parse(checkPointUndo.curvesJSON);
+        this.clickedKnot = undefined;
+        this.clickedCurveIdx = undefined;
+
+        this.reDraw();
+    }
+
+    // redo-ing, record history
+    public redo = () => {
+        if (this.checkPointsRedo.length === 0) {
+            return;
+        }
+
+        let checkPointUndo: { curvesJSON?: string } = {};
+        checkPointUndo.curvesJSON = JSON.stringify(this.curves);
+        this.checkPointsUndo.push(checkPointUndo);
+
+        let checkPointRedo = this.checkPointsRedo.pop();
+        this.curves = JSON.parse(checkPointRedo.curvesJSON);
+
+        this.clickedKnot = undefined;
+        this.clickedCurveIdx = undefined;
+        this.reDraw();
+    }
+
+    // Check if undo/redo should be made available, if so the respective option will be shown
+    public isUndoable = () => {
+        return this.checkPointsUndo.length > 0;
+    }
+
+    public isRedoable = () => {
+        return this.checkPointsRedo.length > 0;
+    }
+
     // Check if movement to new position is over an actionable object, so can render appropriately
     private mouseMoved = (e: MouseEvent) => {
         let mousePosition: Point = GraphUtils.getMousePt(e);
@@ -160,27 +211,23 @@ export class GraphSketcher {
             return;
         }
 
-        let found = "notFound";
-
-        if (found == "notFound") {
-            found = GraphUtils.overItem(this.curves, e, this.MOUSE_DETECT_RADIUS, found);
-            if (found == "overKnot") {
-                this.p.cursor(this.p.HAND);
-                return;
-            } else if ((found == "overAttachedSymbol") || (found == "overFreeSymbol") || (found == "overCurve")) {
-                this.p.cursor(this.p.MOVE);
-                return;
-            } else if (found == "notFound") {
-                this.p.cursor(this.p.CROSS);
-                this.reDraw();
-            }
+        let found = GraphUtils.overItem(this.curves, e, this.MOUSE_DETECT_RADIUS, "notFound");
+        if (found === "overKnot") {
+            this.p.cursor(this.p.HAND);
+            return;
+        } else if ((found === "overAttachedSymbol") || (found === "overFreeSymbol") || (found === "overCurve")) {
+            // TODO: The first two can never happen, as far as I can tell...
+            this.p.cursor(this.p.MOVE);
+            return;
+        } else if (found === "notFound") {
+            this.p.cursor(this.p.CROSS);
+            this.reDraw();
         }
 
         // stretch box
-        if (this.clickedCurveIdx != null) {
+        if (isDefined(this.clickedCurveIdx)) {
             let c = this.curves[this.clickedCurveIdx];
             if (mousePosition[0] >= c.minX && mousePosition[0] <= c.maxX && mousePosition[1] >= c.minY && mousePosition[1] <= c.maxY) {
-                // found = true;
                 this.p.cursor(this.p.MOVE);
             } else if (detect(c.minX, c.minY) || detect(c.maxX, c.minY) || detect(c.minX, c.maxY) || detect(c.maxX, c.maxY)) {
                 this.p.push();
@@ -197,10 +244,9 @@ export class GraphSketcher {
 
                 this.p.pop;
 
-                // found = true;
                 this.p.cursor(this.p.MOVE);
-            } else if (detect((c.minX + c.maxX) / 2, c.minY - 3) || detect((c.minX + c.maxX) / 2, c.maxY + 3)
-                || detect(c.minX - 3, (c.minY + c.maxY) / 2) || detect(c.maxX + 3, (c.minY + c.maxY) / 2)) {
+            } else if (detect((c.minX + c.maxX) / 2, c.minY - 3) || detect((c.minX + c.maxX) / 2, c.maxY + 3) ||
+                       detect(c.minX - 3, (c.minY + c.maxY) / 2) || detect(c.maxX + 3, (c.minY + c.maxY) / 2)) {
 
                 this.p.push();
                 this.p.fill(this.graphView.KNOT_DETECT_COLOR);
@@ -215,7 +261,6 @@ export class GraphSketcher {
                 }
                 this.p.pop();
 
-                // found = true;
                 this.p.cursor(this.p.MOVE);
             }
         }
@@ -252,15 +297,13 @@ export class GraphSketcher {
         this.checkPoint = {};
         this.checkPoint.curvesJSON = JSON.stringify(this.curves);
 
-        // let found = false;
-
         // check if stretching curve
-        if (this.clickedCurveIdx) {
+        if (isDefined(this.clickedCurveIdx)) {
             let c = this.curves[this.clickedCurveIdx];
 
-            if (detect(c.minX, c.minY) || detect(c.maxX, c.minY) || detect(c.minX, c.maxY) || detect(c.maxX, c.maxY)
-                || detect((c.minX + c.maxX)/2, c.minY - 3) || detect((c.minX + c.maxX)/2, c.maxY + 3)
-                || detect(c.minX - 3, (c.minY + c.maxY)/2) || detect(c.maxX + 3, (c.minY + c.maxY)/2)) {
+            if (detect(c.minX, c.minY) || detect(c.maxX, c.minY) || detect(c.minX, c.maxY) || detect(c.maxX, c.maxY) ||
+                detect((c.minX + c.maxX)/2, c.minY - 3) || detect((c.minX + c.maxX)/2, c.maxY + 3) ||
+                detect(c.minX - 3, (c.minY + c.maxY)/2) || detect(c.maxX + 3, (c.minY + c.maxY)/2)) {
 
                 if (detect(c.minX, c.minY)) {
                     this.stretchMode = "bottomLeft";
@@ -279,7 +322,6 @@ export class GraphSketcher {
                 } else {
                     this.stretchMode = "rightMiddle";
                 }
-
 
                 this.action = Action.STRETCH_CURVE;
                 this.clickedKnot = undefined;
@@ -340,8 +382,8 @@ export class GraphSketcher {
             this.action = Action.DRAW_CURVE;
         }
 
-
-        if (this.clickedCurveIdx || this.clickedKnot) {
+        if (isDefined(this.clickedCurveIdx) || isDefined(this.clickedKnot)) {
+            // TODO: Wipe off that stupid look on my face every time I see this
             this.clickedCurveIdx = undefined;
             this.clickedKnot = undefined;
             this.reDraw();
@@ -349,18 +391,15 @@ export class GraphSketcher {
 
         // get drawnColor
         switch (this.colorSelect?.value) {
-            case "Blue": {
+            case "Blue":
                 this.drawnColorIdx = 0;
                 break;
-            }
-            case "Orange": {
+            case "Orange":
                 this.drawnColorIdx = 1;
                 break;
-            }
-            case "Green": {
+            case "Green":
                 this.drawnColorIdx = 2;
                 break;
-            }
             default:
                 this.drawnColorIdx = 0;
                 break;
@@ -374,7 +413,7 @@ export class GraphSketcher {
         let mousePosition = GraphUtils.getMousePt(e);
         this.releasePt = mousePosition;
 
-        if (this.action == Action.STRETCH_POINT && this.clickedCurve) {
+        if (this.action === Action.STRETCH_POINT && isDefined(this.clickedCurve)) {
             let selectedCurve = this.curves[this.clickedCurve];
             // we need to know the (important) ordered end and turning points
             let importantPoints: any[] = [];
@@ -390,14 +429,14 @@ export class GraphSketcher {
             importantPoints.sort(function(a, b){return a[0] - b[0]});
 
             // maxima and minima are treated in slightly different ways
-            if (this.isMaxima !== null) {
+            if (this.isMaxima) {
                 this.curves[this.clickedCurve] = GraphUtils.stretchTurningPoint(importantPoints, e, selectedCurve, this.isMaxima, this.clickedKnotId, this.prevMousePt, this.canvasProperties);
             }
 
             this.reDraw();
             this.prevMousePt = mousePosition;
 
-        } else if (this.action == Action.MOVE_CURVE && this.movedCurveIdx) {
+        } else if (this.action === Action.MOVE_CURVE && isDefined(this.movedCurveIdx)) {
             this.p.cursor(this.p.MOVE);
 
             // scope.trashActive = isOverButton(mousePosition, element.find(".trash-button"));
@@ -408,7 +447,7 @@ export class GraphSketcher {
             GraphUtils.translateCurve(this.curves[this.movedCurveIdx], dx, dy, this.canvasProperties);
             this.reDraw();
 
-        } else if (this.action == Action.STRETCH_CURVE && this.clickedCurveIdx) {
+        } else if (this.action === Action.STRETCH_CURVE && isDefined(this.clickedCurveIdx)) {
             this.p.cursor(this.p.MOVE);
 
             let dx = mousePosition[0] - this.prevMousePt[0];
@@ -425,66 +464,58 @@ export class GraphSketcher {
 
             // update the position of stretched vertex
             switch (this.stretchMode) {
-                case "bottomLeft": {
+                case "bottomLeft":
                     if (orx < 30 && dx > 0  || ory < 30 && dy > 0) {
                         return;
                     }
                     currentCurve.minX += dx;
                     currentCurve.minY += dy;
                     break;
-                }
-                case "bottomRight": {
+                case "bottomRight":
                     if (orx < 30 && dx < 0 || ory < 30 && dy > 0) {
                         return;
                     }
                     currentCurve.maxX += dx;
                     currentCurve.minY += dy;
                     break;
-                }
-                case "topRight": {
+                case "topRight":
                     if (orx < 30 && dx < 0 || ory < 30 && dy < 0) {
                         return;
                     }
                     currentCurve.maxX += dx;
                     currentCurve.maxY += dy;
                     break;
-                }
-                case "topLeft": {
+                case "topLeft":
                     if (orx < 30 && dy > 0 || ory < 30 && dy < 0) {
                         return;
                     }
                     currentCurve.minX += dx;
                     currentCurve.maxY += dy;
                     break;
-                }
-                case "bottomMiddle": {
+                case "bottomMiddle":
                     if ( ory < 30 && dy > 0) {
                         return;
                     }
                     currentCurve.minY += dy;
                     break;
-                }
-                case "topMiddle": {
+                case "topMiddle":
                     if (ory < 30 && dy < 0) {
                         return;
                     }
                     currentCurve.maxY += dy;
                     break;
-                }
-                case "leftMiddle": {
+                case "leftMiddle":
                     if (orx < 30 && dx > 0) {
                         return;
                     }
                     currentCurve.minX += dx;
                     break;
-                }
-                case "rightMiddle": {
+                case "rightMiddle":
                     if (orx < 30 && dx < 0) {
                         return;
                     }
                     currentCurve.maxX += dx;
                     break;
-                }
             }
 
             // calculate the new range
@@ -493,43 +524,35 @@ export class GraphSketcher {
 
             // stretch the curve
             switch (this.stretchMode) {
-                case "bottomLeft": {
+                case "bottomLeft":
                     GraphUtils.stretchCurve(currentCurve, orx, ory, nrx, nry, currentCurve.maxX, currentCurve.maxY, this.canvasProperties);
                     break;
-                }
-                case "bottomRight": {
+                case "bottomRight":
                     GraphUtils.stretchCurve(currentCurve, orx, ory, nrx, nry, currentCurve.minX, currentCurve.maxY, this.canvasProperties);
                     break;
-                }
-                case "topRight": {
+                case "topRight":
                     GraphUtils.stretchCurve(currentCurve, orx, ory, nrx, nry, currentCurve.minX, currentCurve.minY, this.canvasProperties);
                     break;
-                }
-                case "topLeft": {
+                case "topLeft":
                     GraphUtils.stretchCurve(currentCurve, orx, ory, nrx, nry, currentCurve.maxX, currentCurve.minY, this.canvasProperties);
                     break;
-                }
-                case "bottomMiddle": {
+                case "bottomMiddle":
                     GraphUtils.stretchCurve(currentCurve, orx, ory, orx, nry, (currentCurve.minX + currentCurve.maxX)/2, currentCurve.maxY, this.canvasProperties);
                     break;
-                }
-                case "topMiddle": {
+                case "topMiddle":
                     GraphUtils.stretchCurve(currentCurve, orx, ory, orx, nry, (currentCurve.minX + currentCurve.maxX)/2, currentCurve.minY, this.canvasProperties);
                     break;
-                }
-                case "leftMiddle": {
+                case "leftMiddle":
                     GraphUtils.stretchCurve(currentCurve, orx, ory, nrx, ory, currentCurve.maxX, (currentCurve.minY + currentCurve.maxY)/2, this.canvasProperties);
                     break;
-                }
-                case "rightMiddle": {
+                case "rightMiddle":
                     GraphUtils.stretchCurve(currentCurve, orx, ory, nrx, ory, currentCurve.minX, (currentCurve.minY + currentCurve.maxY)/2, this.canvasProperties);
                     break;
-                }
             }
             this.reDraw();
             this.graphView.drawCorner(this.stretchMode, currentCurve);
 
-        } else if (this.action == Action.DRAW_CURVE && this.drawnColorIdx >= 0) {
+        } else if (this.action === Action.DRAW_CURVE && this.drawnColorIdx >= 0) {
             this.p.cursor(this.p.CROSS);
             if (this.curves.length < this.CURVE_LIMIT) {
                 this.p.push();
@@ -551,16 +574,15 @@ export class GraphSketcher {
 
         // if it is just a click, handle click in the following if block
         if (!this.isMouseDragged) {
-
             // clean up the mess of MOVE_SYMBOL and MOVE_CURVE
-            if (this.action  == Action.MOVE_SYMBOL) {
-                if (this.bindedKnot == null) {
+            if (this.action === Action.MOVE_SYMBOL) {
+                // TODO: This does not seem to do anything useful
+                if (!this.bindedKnot) {
                     // this.freeSymbols.push(this.movedSymbol);
                 } else {
                     this.bindedKnot[this.symbolType || ''] = this.movedSymbol;
                 }
                 this.reDraw();
-
             } else if ([Action.MOVE_CURVE, Action.STRETCH_CURVE, Action.STRETCH_POINT].includes(this.action)) {
                 this.reDraw();
             }
@@ -569,7 +591,6 @@ export class GraphSketcher {
             if (!this.isActive(mousePosition)) {
                 return;
             }
-
 
             // check if show stretch box
             for (let i = 0; i < this.curves.length; i++) {
@@ -584,7 +605,7 @@ export class GraphSketcher {
             }
 
 
-            if (this.clickedKnot || this.clickedCurveIdx) {
+            if (isDefined(this.clickedKnot) || isDefined(this.clickedCurveIdx)) {
                 this.clickedKnot = undefined;
                 this.clickedCurveIdx = undefined;
                 this.reDraw();
@@ -593,12 +614,11 @@ export class GraphSketcher {
             return;
         }
 
-        if (this.action == Action.MOVE_CURVE) {
-
+        if (this.action === Action.MOVE_CURVE) {
             this.checkPointsUndo.push(this.checkPoint);
             this.checkPointsRedo = [];
 
-            // for deletion
+            // TODO: Fix this to enable deletion
             // if (scope.trashActive) {
             //     let curve = (this.curves.splice(this.movedCurveIdx, 1))[0];
 
@@ -609,19 +629,19 @@ export class GraphSketcher {
             // scope.$apply();
             this.reDraw();
 
-        } else if (this.action == Action.STRETCH_CURVE) {
+        } else if (this.action === Action.STRETCH_CURVE) {
             this.checkPointsUndo.push(this.checkPoint);
             this.checkPointsRedo = [];
 
             // let c = this.curves[this.clickedCurveIdx];
 
-        } else if (this.action == Action.STRETCH_POINT) {
+        } else if (this.action === Action.STRETCH_POINT) {
             this.checkPointsUndo.push(this.checkPoint);
             this.checkPointsRedo = [];
 
             // let c = this.curves[this.clickedCurveIdx];
 
-        } else if (this.action == Action.DRAW_CURVE) {
+        } else if (this.action === Action.DRAW_CURVE) {
 
             if (this.curves.length < this.CURVE_LIMIT){
 
@@ -717,10 +737,10 @@ export class GraphSketcher {
 
     // TODO: Delete key here
     // window.onkeydown = function(event) {
-    //     if (event.keyCode == 46) { // delete key
+    //     if (event.keyCode === 46) { // delete key
     //         this.p.checkPointsUndo.push(p.checkPoint);
     //         this.p.checkPointsRedo = [];
-    //         if (this.clickedCurveIdx != null) {
+    //         if (this.clickedCurveIdx) {
     //             let curve = (this.curves.splice(this.clickedCurveIdx, 1))[0];
 
     //             this.clickedCurveIdx = null;
