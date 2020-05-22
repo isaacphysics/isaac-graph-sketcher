@@ -62,12 +62,12 @@ export class GraphSketcher {
     
     private prevMousePt: Point = [0,0];
 
-    // fving and stretching curve
+    // for moving and stretching curve
     private movedCurveIdx?: number;
     private stretchMode?: string;
     private isMaxima?: boolean;
 
-    // fving symbols
+    // for moving symbols
     private movedSymbol?: null; // TODO: WTF is this?
     private bindedKnot?: { [x: string]: any; };
     private symbolType?: string;
@@ -78,12 +78,14 @@ export class GraphSketcher {
     private clickedCurve?: number;
     private clickedCurveIdx?: number;
 
-    // private scope: any = {};
     private canvas?: p5.Renderer;
     private elements: HTMLElement[] = [];
     private colorSelect?: HTMLSelectElement;
+    private trashButton?: HTMLElement;
+    public isTrashActive? = false;
 
     // The following public members can be modified from the outside
+    public drawingColorName: string = "Blue";
     public selectedLineType = LineType.BEZIER;
     public updateGraphSketcherState?: (state: { canvasWidth: number; canvasHeight: number; curves: Curve[] }) => void;
 
@@ -97,6 +99,7 @@ export class GraphSketcher {
         this.p.mouseDragged = this.mouseDragged;
         this.p.touchEnded = this.touchEnded;
         this.p.mouseReleased = this.mouseReleased;
+        this.p.keyReleased = this.keyReleased;
 
         this.p.windowResized = this.windowResized;
 
@@ -113,9 +116,14 @@ export class GraphSketcher {
         this.elements.push(document.getElementById("graph-sketcher-ui-undo-button") as HTMLElement);
         this.elements.push(document.getElementById("graph-sketcher-ui-bezier-button") as HTMLElement);
         this.elements.push(document.getElementById("graph-sketcher-ui-linear-button") as HTMLElement);
-        this.elements.push(document.getElementById("graph-sketcher-ui-trash-button") as HTMLElement);
+
+        this.trashButton = document.getElementById("graph-sketcher-ui-trash-button") as HTMLElement;
+        this.trashButton.addEventListener('click', this.deleteSelectedCurve);
+        this.elements.push(this.trashButton);
+        
         this.elements.push(document.getElementById("graph-sketcher-ui-submit-button") as HTMLElement);
         this.colorSelect = document.getElementById("graph-sketcher-ui-color-select") as HTMLSelectElement;
+        
         this.elements.push(this.colorSelect);
 
         this.p.noLoop();
@@ -123,6 +131,12 @@ export class GraphSketcher {
         this.reDraw();
     }
 
+    private deleteSelectedCurve = () => {
+        if (isDefined(this.clickedCurveIdx)) {
+            let curve = (this.curves.splice(this.clickedCurveIdx, 1))[0];
+            this.clickedCurveIdx = undefined;
+        }
+    }
 
     private isOverButton = (pt: Point, button: HTMLElement) => {
         const rect = button.getBoundingClientRect();
@@ -439,7 +453,7 @@ export class GraphSketcher {
         } else if (this.action === Action.MOVE_CURVE && isDefined(this.movedCurveIdx)) {
             this.p.cursor(this.p.MOVE);
 
-            // scope.trashActive = isOverButton(mousePosition, element.find(".trash-button"));
+            this.isTrashActive = this.isOverButton(mousePosition, this.trashButton as HTMLElement);
 
             let dx = mousePosition[0] - this.prevMousePt[0];
             let dy = mousePosition[1] - this.prevMousePt[1];
@@ -604,7 +618,6 @@ export class GraphSketcher {
                 }
             }
 
-
             if (isDefined(this.clickedKnot) || isDefined(this.clickedCurveIdx)) {
                 this.clickedKnot = undefined;
                 this.clickedCurveIdx = undefined;
@@ -618,15 +631,12 @@ export class GraphSketcher {
             this.checkPointsUndo.push(this.checkPoint);
             this.checkPointsRedo = [];
 
-            // TODO: Fix this to enable deletion
-            // if (scope.trashActive) {
-            //     let curve = (this.curves.splice(this.movedCurveIdx, 1))[0];
+            if (this.isTrashActive && isDefined(this.movedCurveIdx)) {
+                this.curves.splice(this.movedCurveIdx, 1);
+                this.clickedCurveIdx = undefined;
+            }
 
-            //     this.clickedCurveIdx = null;
-            // }
-
-            // scope.trashActive = false;
-            // scope.$apply();
+            this.isTrashActive = false;
             this.reDraw();
 
         } else if (this.action === Action.STRETCH_CURVE) {
@@ -735,19 +745,18 @@ export class GraphSketcher {
         this.reDraw();
     }
 
-    // TODO: Delete key here
-    // window.onkeydown = function(event) {
-    //     if (event.keyCode === 46) { // delete key
-    //         this.p.checkPointsUndo.push(p.checkPoint);
-    //         this.p.checkPointsRedo = [];
-    //         if (this.clickedCurveIdx) {
-    //             let curve = (this.curves.splice(this.clickedCurveIdx, 1))[0];
-
-    //             this.clickedCurveIdx = null;
-    //             reDraw();
-    //         }
-    //     }
-    // }
+    private keyReleased = () => {
+        console.log(this.p.key, this.p.keyCode);
+        if (this.p.key === "Delete" || this.p.key === "Backspace") {
+            this.checkPointsUndo.push(this.checkPoint);
+            this.checkPointsRedo = [];
+            if (isDefined(this.clickedCurveIdx)) {
+                this.curves.splice(this.clickedCurveIdx, 1);
+                this.clickedCurveIdx = undefined;
+                this.reDraw();
+            }
+        }
+    }
 
     // equivalent to 'locally' refreshing the canvas
     private reDraw = () => {
