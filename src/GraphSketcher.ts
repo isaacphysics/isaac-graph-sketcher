@@ -39,10 +39,14 @@ export enum LineType {
     LINEAR
 };
 
+export interface GraphSketcherState { canvasWidth: number; canvasHeight: number; curves: Curve[] };
+
 export class GraphSketcher {
     private p: p5;
     private canvasProperties: { width: number, height: number };
     private graphView: GraphView;
+
+    private previewMode: boolean = false;
 
     private checkPoint: any;
     public  checkPointsUndo: any[] = [];
@@ -72,13 +76,13 @@ export class GraphSketcher {
     private bindedKnot?: { [x: string]: any; };
     private symbolType?: string;
 
-    private curves: Curve[] = [];
+    public curves: Curve[] = [];
     private clickedKnot?: number;
     private clickedKnotId?: number;
     private clickedCurve?: number;
     private clickedCurveIdx?: number;
 
-    private canvas?: p5.Renderer;
+    public canvas?: p5.Renderer;
     private elements: HTMLElement[] = [];
     private colorSelect?: HTMLSelectElement;
     private trashButton?: HTMLElement;
@@ -87,9 +91,9 @@ export class GraphSketcher {
     // The following public members can be modified from the outside
     public drawingColorName: string = "Blue";
     public selectedLineType = LineType.BEZIER;
-    public updateGraphSketcherState?: (state: { canvasWidth: number; canvasHeight: number; curves: Curve[] }) => void;
+    public updateGraphSketcherState?: (state: GraphSketcherState) => void;
 
-    constructor(p: p5, width: number, height: number) {
+    constructor(p: p5, width: number, height: number, options: { previewMode: boolean, initialCurves: Curve[]}) {
         this.p = p;
 
         this.p.touchStarted = this.touchStarted;
@@ -107,24 +111,28 @@ export class GraphSketcher {
 
         this.canvasProperties = { width, height };
         this.graphView = new GraphView(p, width, height);
+        this.previewMode = options.previewMode;
+        this.curves = options.initialCurves;
     }
 
     // run in the beginning by p5 library
     private setup = () => {
         this.canvas = this.p.createCanvas(this.canvasProperties.width, this.canvasProperties.height);
-        this.elements.push(document.getElementById("graph-sketcher-ui-redo-button") as HTMLElement);
-        this.elements.push(document.getElementById("graph-sketcher-ui-undo-button") as HTMLElement);
-        this.elements.push(document.getElementById("graph-sketcher-ui-bezier-button") as HTMLElement);
-        this.elements.push(document.getElementById("graph-sketcher-ui-linear-button") as HTMLElement);
+        if (!this.previewMode) {
+            this.elements.push(document.getElementById("graph-sketcher-ui-redo-button") as HTMLElement);
+            this.elements.push(document.getElementById("graph-sketcher-ui-undo-button") as HTMLElement);
+            this.elements.push(document.getElementById("graph-sketcher-ui-bezier-button") as HTMLElement);
+            this.elements.push(document.getElementById("graph-sketcher-ui-linear-button") as HTMLElement);
 
-        this.trashButton = document.getElementById("graph-sketcher-ui-trash-button") as HTMLElement;
-        this.trashButton.addEventListener('click', this.deleteSelectedCurve);
-        this.elements.push(this.trashButton);
-        
-        this.elements.push(document.getElementById("graph-sketcher-ui-submit-button") as HTMLElement);
-        this.colorSelect = document.getElementById("graph-sketcher-ui-color-select") as HTMLSelectElement;
-        
-        this.elements.push(this.colorSelect);
+            this.trashButton = document.getElementById("graph-sketcher-ui-trash-button") as HTMLElement;
+            this.trashButton.addEventListener('click', this.deleteSelectedCurve);
+            this.elements.push(this.trashButton);
+            
+            this.elements.push(document.getElementById("graph-sketcher-ui-submit-button") as HTMLElement);
+            this.colorSelect = document.getElementById("graph-sketcher-ui-color-select") as HTMLSelectElement;
+            
+            this.elements.push(this.colorSelect);
+        }
 
         this.p.noLoop();
         this.p.cursor(this.p.ARROW);
@@ -758,6 +766,11 @@ export class GraphSketcher {
         }
     }
 
+    public setCurves = (curves: Curve[]) => {
+        this.curves = curves;
+        // this.reDraw();
+    }
+
     // equivalent to 'locally' refreshing the canvas
     private reDraw = () => {
         if (this.curves.length < 4) {
@@ -767,6 +780,7 @@ export class GraphSketcher {
             if (this.updateGraphSketcherState) {
                 const newState = GraphUtils.encodeData(true, this.canvasProperties, this.curves);
                 if (newState) {
+                    // TODO: This may be optimised in cases when the state is unlikely to have changed.
                     this.updateGraphSketcherState(newState);
                 }
             }
@@ -774,10 +788,10 @@ export class GraphSketcher {
     };
 }
 
-export function makeGraphSketcher(element: HTMLElement | undefined, width: number, height: number): { sketch?: GraphSketcher, p: p5 } {
+export function makeGraphSketcher(element: HTMLElement | undefined, width: number, height: number, options: { previewMode: boolean, initialCurves: Curve[] } = { previewMode: false, initialCurves: []}): { sketch?: GraphSketcher, p: p5 } {
     let sketch: GraphSketcher | undefined;
     let p = new p5(instance => {
-        sketch = new GraphSketcher(instance, width, height);
+        sketch = new GraphSketcher(instance, width, height, options);
         return sketch;
     }, element);
     return { sketch, p };
