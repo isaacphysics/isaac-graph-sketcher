@@ -139,6 +139,10 @@ export class GraphSketcher {
         this.reDraw();
     }
 
+    public teardown = () => {
+        this.trashButton?.removeEventListener('click', this.deleteSelectedCurve);
+    }
+
     private deleteSelectedCurve = () => {
         if (isDefined(this.clickedCurveIdx)) {
             let curve = (this.curves.splice(this.clickedCurveIdx, 1))[0];
@@ -222,6 +226,9 @@ export class GraphSketcher {
 
     // Check if movement to new position is over an actionable object, so can render appropriately
     private mouseMoved = (e: MouseEvent) => {
+        console.log("MM P: ", this.previewMode)
+        if (this.previewMode) return;
+
         let mousePosition: Point = GraphUtils.getMousePt(e);
 
         function detect(x: number, y: number) {
@@ -290,6 +297,8 @@ export class GraphSketcher {
 
     // Determines type of action when clicking on something within the canvas
     private mousePressed = (e: MouseEvent) => {
+        console.log("MP P: ", this.previewMode)
+        if (this.previewMode) return;
 
         this.isMouseDragged = false;
         this.action = Action.NO_ACTION;
@@ -431,6 +440,9 @@ export class GraphSketcher {
 
     // Keep actions for curve manipulation together
     private mouseDragged = (e: MouseEvent) => {
+        console.log("MD P: ", this.previewMode)
+        if (this.previewMode) return;
+
         this.isMouseDragged = true;
         let mousePosition = GraphUtils.getMousePt(e);
         this.releasePt = mousePosition;
@@ -592,6 +604,9 @@ export class GraphSketcher {
 
     // Need to know where to update points to - gives final position
     private mouseReleased = (_e: MouseEvent) => {
+        console.log("MR P: ", this.previewMode)
+        if (this.previewMode) return;
+
         let mousePosition = this.releasePt;
 
         // if it is just a click, handle click in the following if block
@@ -733,18 +748,24 @@ export class GraphSketcher {
 
     // Would like to be used on touch screen devices, this simply facilitates it
     private touchStarted = (e: TouchEvent) => {
+        if (this.previewMode) return;
+
         this.p.mousePressed(e.touches[0]);
     }
 
     private touchMoved = (e: TouchEvent) => {
+        if (this.previewMode) return;
+
         this.p.mouseDragged(e.touches[0]);
     }
 
     private touchEnded = (e: TouchEvent) => {
+        if (this.previewMode) return;
+
         this.p.mouseReleased(e);
     }
 
-    private windowResized = () => {
+    public windowResized = () => {
         let data = GraphUtils.encodeData(false, this.canvasProperties, this.curves);
         this.canvasProperties.width = window.innerWidth;
         this.canvasProperties.height = window.innerHeight;
@@ -754,7 +775,6 @@ export class GraphSketcher {
     }
 
     private keyReleased = () => {
-        console.log(this.p.key, this.p.keyCode);
         if (this.p.key === "Delete" || this.p.key === "Backspace") {
             this.checkPointsUndo.push(this.checkPoint);
             this.checkPointsRedo = [];
@@ -779,7 +799,7 @@ export class GraphSketcher {
             this.graphView.drawStretchBox(this.clickedCurveIdx, this.curves);
             if (this.updateGraphSketcherState) {
                 const newState = GraphUtils.encodeData(true, this.canvasProperties, this.curves);
-                if (newState) {
+                if (newState && !this.previewMode) {
                     // TODO: This may be optimised in cases when the state is unlikely to have changed.
                     this.updateGraphSketcherState(newState);
                 }
