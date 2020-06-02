@@ -117,7 +117,6 @@ export class GraphSketcher {
 
     // run in the beginning by p5 library
     private setup = () => {
-        this.canvas = this.p.createCanvas(this.canvasProperties.width, this.canvasProperties.height);
         if (!this.previewMode) {
             this.elements.push(document.getElementById("graph-sketcher-ui-redo-button") as HTMLElement);
             this.elements.push(document.getElementById("graph-sketcher-ui-undo-button") as HTMLElement);
@@ -133,9 +132,9 @@ export class GraphSketcher {
             
             this.elements.push(this.colorSelect);
         }
-
         this.p.noLoop();
         this.p.cursor(this.p.ARROW);
+        this.canvas = this.p.createCanvas(this.canvasProperties.width, this.canvasProperties.height);
         this.reDraw();
     }
 
@@ -504,7 +503,7 @@ export class GraphSketcher {
             let orx = currentCurve.maxX - currentCurve.minX;
             let ory = currentCurve.maxY - currentCurve.minY;
 
-            this.graphView.drawCorner(this.stretchMode, currentCurve);
+            this.graphView.drawCorner(this.stretchMode || "none", currentCurve);
 
             // update the position of stretched vertex
             switch (this.stretchMode) {
@@ -594,7 +593,7 @@ export class GraphSketcher {
                     break;
             }
             this.reDraw();
-            this.graphView.drawCorner(this.stretchMode, currentCurve);
+            this.graphView.drawCorner(this.stretchMode || "none", currentCurve);
 
         } else if (this.action === Action.DRAW_CURVE && this.drawnColorIdx >= 0) {
             this.p.cursor(this.p.CROSS);
@@ -795,13 +794,8 @@ export class GraphSketcher {
         }
     }
 
-    public setCurves = (curves: Curve[]) => {
-        this.curves = curves;
-        // this.reDraw();
-    }
-
     // equivalent to 'locally' refreshing the canvas
-    private reDraw = () => {
+    public reDraw = () => {
         if (this.curves.length < 4) {
             this.graphView.drawBackground(this.canvasProperties.width, this.canvasProperties.height);
             this.graphView.drawCurves(this.curves);

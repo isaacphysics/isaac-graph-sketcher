@@ -1,20 +1,15 @@
-// @ts-nocheck
+import { Curve, Point } from "./GraphSketcher";
 
 const SAMPLE_INTERVAL = 10;
 const numOfPts = 100;
 
 // methods used in manipulating the graphs
-export function getDist(pt1, pt2) {
+export function getDist(pt1: Point, pt2: Point) {
     return Math.sqrt(Math.pow(pt1[0] - pt2[0], 2) + Math.pow(pt1[1] - pt2[1], 2));
 }
 
 // enables data to be encoded/decoded to input on reload (2nd attempt at a question etc)
-export function encodeData(trunc, canvasProperties, curves) {
-
-    if (trunc == undefined) {
-        trunc = true;
-    }
-
+export function encodeData(trunc: boolean, canvasProperties: { width: any; height: any; }, curves: Curve[]) {
     if (canvasProperties.width > 5000 || canvasProperties.width <= 0) {
         alert("Invalid canvasProperties.width.");
         return;
@@ -25,19 +20,22 @@ export function encodeData(trunc, canvasProperties, curves) {
         return;
     }
 
-    let data = {};
-    data.canvasWidth = canvasProperties.width;
-    data.canvasHeight = canvasProperties.height;
+    const data: { canvasWidth: number, canvasHeight: number, curves: Curve[] } =  {
+        canvasWidth: canvasProperties.width,
+        canvasHeight: canvasProperties.height,
+        curves: []
+    }
 
-    let clonedCurves = this.clone(curves);
+    let clonedCurves = _clone(curves);
 
     // sort segments according to their left most points.
-    function compare(curve1, curve2) {
-        function findMinX(pts) {
-            if (pts.length == 0) return 0;
+    function compare(curve1: Curve, curve2: Curve) {
+        function findMinX(pts: Point[]) {
+            if (pts.length === 0) return 0;
             let min = canvasProperties.width;
-            for (let i = 0; i < pts.length; i++)
+            for (let i = 0; i < pts.length; i++) {
                 min = Math.min(min, pts[i][0]);
+            }
             return min;
         }
 
@@ -50,7 +48,7 @@ export function encodeData(trunc, canvasProperties, curves) {
 
     clonedCurves.sort(compare);
 
-    function normalise(pt) {
+    function normalise(pt: Point) {
         let x = (pt[0] - canvasProperties.width/2) / canvasProperties.width;
         let y = (canvasProperties.height/2 - pt[1]) / canvasProperties.height;
         if (trunc) {
@@ -62,27 +60,24 @@ export function encodeData(trunc, canvasProperties, curves) {
         }
     }
 
-    function normalise1(knots) {
+    function normalise1(knots: Point[]) {
         for (let j = 0; j < knots.length; j++) {
             let knot = knots[j];
             normalise(knot);
-            if (knot.symbol != undefined) {
-                normalise(knot.symbol);
-            }
         }
     }
 
-    function normalise2(knots) {
+    function normalise2(knots: Point[]) {
         normalise1(knots);
-        for (let j = 0; j < knots.length; j++) {
-            let knot = knots[j];
-            if (knot.xSymbol != undefined) {
-                normalise(knot.xSymbol);
-            }
-            if (knot.ySymbol != undefined) {
-                normalise(knot.ySymbol);
-            }
-        }
+        // for (let j = 0; j < knots.length; j++) {
+        //     let knot = knots[j];
+        //     if (knot.xSymbol != undefined) {
+        //         normalise(knot.xSymbol);
+        //     }
+        //     if (knot.ySymbol != undefined) {
+        //         normalise(knot.ySymbol);
+        //     }
+        // }
     }
 
 
@@ -125,38 +120,35 @@ export function encodeData(trunc, canvasProperties, curves) {
     return data;
 };
 
-export function decodeData(data, width, height) {
+export function decodeData(data: { canvasWidth: number; canvasHeight: number; curves: Curve[]; } | undefined, width: number, height: number) {
 
-    function denormalise(pt) {
+    function denormalise(pt: Point) {
         pt[0] = pt[0] * width + width/2;
         pt[1] = height/2 - pt[1] * height;
     }
 
-    function denormalise1(knots) {
+    function denormalise1(knots: Point[]) {
         for (let j = 0; j < knots.length; j++) {
             let knot = knots[j];
             denormalise(knot);
-            if (knot.symbol != undefined) {
-                denormalise(knot.symbol);
-            }
         }
     }
 
-    function denormalise2(knots) {
+    function denormalise2(knots: Point[]) {
         denormalise1(knots);
-        for (let j = 0; j < knots.length; j++) {
-            let knot = knots[j];
-            if (knot.xSymbol != undefined) {
-                denormalise(knot.xSymbol);
-            }
-            if (knot.ySymbol != undefined) {
-                denormalise(knot.ySymbol);
-            }
-        }
+        // for (let j = 0; j < knots.length; j++) {
+        //     let knot = knots[j];
+        //     if (knot.xSymbol != undefined) {
+        //         denormalise(knot.xSymbol);
+        //     }
+        //     if (knot.ySymbol != undefined) {
+        //         denormalise(knot.ySymbol);
+        //     }
+        // }
     }
 
 
-    let curves = data.curves;
+    let curves = data?.curves || [];
 
     for (let i = 0; i < curves.length; i++) {
 
@@ -186,23 +178,24 @@ export function decodeData(data, width, height) {
     return;
 };
 
-export function detect(e, x, y) {
-    let mousePosition = this.getMousePt(e);
-    return (this.getDist(mousePosition, this.createPoint(x, y)) < 5);
+// TODO 'e' is probably a mouse event of some sort
+export function detect(e: any, x: number, y: number) {
+    let mousePosition = getMousePt(e);
+    return (getDist(mousePosition, createPoint(x, y)) < 5);
 };
 
-export function getMousePt(e) {
+export function getMousePt(e: any) {
     let x = (e.clientX - 5);
     let y = (e.clientY - 5);
-    return this.createPoint(x, y);
+    return createPoint(x, y);
 };
 
-export function createPoint(x, y) {
+export function createPoint(x: number, y: number) {
     let obj = [x, y];
     return obj;
 };
 
-export function linearLineStyle(pts) {
+export function linearLineStyle(pts: Point[]) {
     pts.sort(function(a, b){return a[0] - b[0]});
     let start = pts[0];
     let end = pts[1];
@@ -213,15 +206,15 @@ export function linearLineStyle(pts) {
     for (let currentPoint = 0; currentPoint < numOfPts; currentPoint += 1) {
         let x_co = pts[0][0] + (currentPoint*increment*x_diff);
         let y_co = pts[0][1] + (currentPoint*increment*y_diff);
-        linearPoints.push(this.createPoint(x_co,y_co));
+        linearPoints.push(createPoint(x_co,y_co));
     }
     return linearPoints;
 };
 
-export function bezierLineStyle(pts) {
+export function bezierLineStyle(pts: Point[]) {
 
     // See https://github.com/josdejong/mathjs/blob/v5.8.0/src/function/probability/product.js
-    let product = function(i, n) {
+    let product = function(i: number, n: number): number {
         let half;
         if (n < i) {
             return 1;
@@ -234,7 +227,7 @@ export function bezierLineStyle(pts) {
     }
 
         // See https://github.com/josdejong/mathjs/blob/v5.8.0/src/function/probability/combinations.js
-    let combinations = function(n, k) {
+    let combinations = function(n: number, k: number): number {
         let prodrange, nMinusk;
 
             if (n < 0 || k < 0) {
@@ -279,20 +272,20 @@ export function bezierLineStyle(pts) {
             sx += tmp3 * pts[currentIndex][0];
             sy += tmp3 * pts[currentIndex][1];
         }
-        bezier.push(this.createPoint(sx, sy));
+        bezier.push(createPoint(sx, sy));
     }
     bezier.push(pts[pts.length - 1]);
     return bezier;
 };
 
-export function sample(pts) {
+export function sample(pts: Point[]) {
     let sampled = [];
     sampled.push(pts[0]);
     let i = 0;
     let j = 0;
     while (i < pts.length) {
         
-        while (j < pts.length && this.getDist(pts[i], pts[j]) < SAMPLE_INTERVAL) {
+        while (j < pts.length && getDist(pts[i], pts[j]) < SAMPLE_INTERVAL) {
             j += 1;
         }
 
@@ -306,20 +299,20 @@ export function sample(pts) {
     return sampled;
 }
 
-export function overItem(curves, e, MOUSE_DETECT_RADIUS, found) {
-    let mousePosition = this.getMousePt(e);
-    let loop = function(knots) {
+export function overItem(curves: Curve[], e: any, MOUSE_DETECT_RADIUS: number, found: string) {
+    let mousePosition = getMousePt(e);
+    let loop = function(knots: Point[]) {
         for (let j = 0; j < knots.length; j++) {
             let knot = knots[j];
-            if (this.getDist(mousePosition, knot) < MOUSE_DETECT_RADIUS) {
+            if (getDist(mousePosition, knot) < MOUSE_DETECT_RADIUS) {
                 found = "overKnot";
             } 
         }
-    }.bind(this);
+    };
 
     for (let j = 0; j < curves.length; j++) { // detects if mouse is over curve
         for (let k = 0; k < curves[j].pts.length; k++) {
-            if (this.getDist(mousePosition, curves[j].pts[k]) < MOUSE_DETECT_RADIUS) {
+            if (getDist(mousePosition, curves[j].pts[k]) < MOUSE_DETECT_RADIUS) {
                 found = "overCurve";
             }
         }
@@ -341,19 +334,19 @@ export function overItem(curves, e, MOUSE_DETECT_RADIUS, found) {
     return found;
 };
 
-export function findEndPts(pts) { 
+export function findEndPts(pts: Point[]) { 
     if (pts.length == 0) return [];
 
     let ends = [];
 
-    ends.push(this.createPoint(pts[0][0], pts[0][1]));
-    ends.push(this.createPoint(pts[pts.length - 1][0], pts[pts.length - 1][1]));
+    ends.push(createPoint(pts[0][0], pts[0][1]));
+    ends.push(createPoint(pts[pts.length - 1][0], pts[pts.length - 1][1]));
 
     // 200 acceptable for showing a curve is no longer just one line
     for (let i = 1; i < pts.length; i++) {
         if (pts[i-1][0] - pts[i][0] > 200) {
-            ends.push(this.createPoint(pts[i-1][0], pts[i-1][1]));
-            ends.push(this.createPoint(pts[i][0], pts[i][1]));
+            ends.push(createPoint(pts[i-1][0], pts[i-1][1]));
+            ends.push(createPoint(pts[i][0], pts[i][1]));
             continue;
         }
     }
@@ -361,8 +354,8 @@ export function findEndPts(pts) {
     if (ends.length == 2) {
         for (let i = pts.length - 2; i > 1; i--) {
             if (pts[i+1][0] - pts[i][0] > 200) {
-                ends.push(this.createPoint(pts[i+1][0], pts[i+1][1]));
-                ends.push(this.createPoint(pts[i][0], pts[i][1]));
+                ends.push(createPoint(pts[i+1][0], pts[i+1][1]));
+                ends.push(createPoint(pts[i][0], pts[i][1]));
                 continue;
             }
         }
@@ -371,7 +364,7 @@ export function findEndPts(pts) {
     return ends;
 };
 
-export function findInterceptX(canvasHeight, pts) {
+export function findInterceptX(canvasHeight: number, pts: Point[]) {
     if (pts.length == 0) return [];
 
     let intercepts = [];
@@ -379,7 +372,7 @@ export function findInterceptX(canvasHeight, pts) {
     if (pts[0][1] == canvasHeight/2) intercepts.push(pts[0]);
     for (let i = 1; i < pts.length; i++) {
         if (pts[i][1] == canvasHeight/2) {
-            intercepts.push(this.createPoint(pts[i][0], pts[i][1]));
+            intercepts.push(createPoint(pts[i][0], pts[i][1]));
             continue;
         }
 
@@ -388,14 +381,14 @@ export function findInterceptX(canvasHeight, pts) {
             let dy = pts[i][1] - pts[i-1][1];
             let grad = dy/dx;
             let esti = pts[i-1][0] + (1 / grad) * (canvasHeight/2 - pts[i-1][1]);
-            intercepts.push(this.createPoint(esti, canvasHeight/2));
+            intercepts.push(createPoint(esti, canvasHeight/2));
         }
     }
 
     return intercepts;
 };
 
-export function findInterceptY(canvasWidth, pts) {
+export function findInterceptY(canvasWidth: number, pts: Point[]) {
     if (pts.length == 0) return [];
 
     let intercepts = [];
@@ -403,7 +396,7 @@ export function findInterceptY(canvasWidth, pts) {
     if (pts[0][0] == canvasWidth/2) intercepts.push(pts[0]);
     for (let i = 1; i < pts.length; i++) {
         if (pts[i][0] == canvasWidth/2) {
-            intercepts.push(this.createPoint(pts[i][0], pts[i][1]));
+            intercepts.push(createPoint(pts[i][0], pts[i][1]));
             continue;
         }
 
@@ -412,28 +405,28 @@ export function findInterceptY(canvasWidth, pts) {
             let dy = pts[i][1] - pts[i-1][1];
             let grad = dy/dx;
             let esti = pts[i-1][1] + grad * (canvasWidth/2 - pts[i-1][0]);
-            intercepts.push(this.createPoint(canvasWidth/2, esti));
+            intercepts.push(createPoint(canvasWidth/2, esti));
         }
     }
 
     return intercepts;
 };
 
-export function findTurnPts(pts, mode) {
+export function findTurnPts(pts: Point[], mode: string) {
     if (pts.length == 0) {
         return [];
     }
 
     let turnPts = [];
     let potentialPts = [];
-    let statPts = [];
+    let statPts: Point[] = [];
     let pot_max = [];
     let pot_min = [];
     let CUTOFF = 10;
 
     for (let i = CUTOFF; i < pts.length-CUTOFF; i++) {
         if ((pts[i][1] < pts[i-1][1] && pts[i][1] < pts[i+1][1]) || (pts[i][1] > pts[i-1][1] && pts[i][1] > pts[i+1][1]) || (pts[i][1] == pts[i-1][1])) {
-            potentialPts.push(this.createPoint(pts[i][0], pts[i][1]));
+            potentialPts.push(createPoint(pts[i][0], pts[i][1]));
         }
     }
 
@@ -738,7 +731,7 @@ export function stretchCurve(c, orx, ory, nrx, nry, baseX, baseY, canvasProperti
     c.interY = loop2(interY, newInterY);
 };
 
-export function clone(obj) {
+export function _clone(obj: any) {
     let json = JSON.stringify(obj);
     return JSON.parse(json);
 };
