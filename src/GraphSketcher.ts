@@ -140,6 +140,19 @@ export class GraphSketcher {
     }
 
     public teardown = () => {
+        this.p.touchStarted = () => {};
+        this.p.mousePressed = () => {};
+        this.p.touchMoved = () => {};
+        this.p.mouseMoved = () => {};
+        this.p.mouseDragged = () => {};
+        this.p.touchEnded = () => {};
+        this.p.mouseReleased = () => {};
+        this.p.keyReleased = () => {};
+
+        this.p.windowResized = () => {};
+
+        this.p.setup = () => {};
+
         this.trashButton?.removeEventListener('click', this.deleteSelectedCurve);
     }
 
@@ -226,7 +239,6 @@ export class GraphSketcher {
 
     // Check if movement to new position is over an actionable object, so can render appropriately
     private mouseMoved = (e: MouseEvent) => {
-        console.log("MM P: ", this.previewMode)
         if (this.previewMode) return;
 
         let mousePosition: Point = GraphUtils.getMousePt(e);
@@ -297,7 +309,6 @@ export class GraphSketcher {
 
     // Determines type of action when clicking on something within the canvas
     private mousePressed = (e: MouseEvent) => {
-        console.log("MP P: ", this.previewMode)
         if (this.previewMode) return;
 
         this.isMouseDragged = false;
@@ -440,7 +451,6 @@ export class GraphSketcher {
 
     // Keep actions for curve manipulation together
     private mouseDragged = (e: MouseEvent) => {
-        console.log("MD P: ", this.previewMode)
         if (this.previewMode) return;
 
         this.isMouseDragged = true;
@@ -604,7 +614,6 @@ export class GraphSketcher {
 
     // Need to know where to update points to - gives final position
     private mouseReleased = (_e: MouseEvent) => {
-        console.log("MR P: ", this.previewMode)
         if (this.previewMode) return;
 
         let mousePosition = this.releasePt;
