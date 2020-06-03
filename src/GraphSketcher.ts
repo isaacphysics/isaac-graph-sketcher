@@ -1,12 +1,7 @@
 import p5 from 'p5';
 import GraphView from './GraphView';
+import { isDefined } from './GraphUtils';
 import * as GraphUtils from './GraphUtils';
-
-// undefined|null checker and type guard all-in-wonder.
-// Why is this not in Typescript?
-function isDefined<T>(stuff: T): stuff is NonNullable<T> {
-    return stuff !== undefined && stuff !== null
-}
 
 // TODO: Make this an actual point
 export type Point = number[];
@@ -16,7 +11,7 @@ export class Curve {
     maxX: number = 0;
     minY: number = 0;
     maxY: number = 0;
-    endPt: Point = [0,0];
+    endPts?: Point[];
     interX: Point[] = [];
     interY: Point[] = [];
     maxima: Point[] = [];
@@ -459,21 +454,24 @@ export class GraphSketcher {
         if (this.action === Action.STRETCH_POINT && isDefined(this.clickedCurve)) {
             let selectedCurve = this.curves[this.clickedCurve];
             // we need to know the (important) ordered end and turning points
-            let importantPoints: any[] = [];
+            let importantPoints: Point[] = [];
             if (selectedCurve.pts[0][0] > selectedCurve.pts[selectedCurve.pts.length - 1][0]) {
                 selectedCurve.pts.reverse();
             }
-            selectedCurve.endPt = GraphUtils.findEndPts(selectedCurve.pts);
+            selectedCurve.endPts = GraphUtils.findEndPts(selectedCurve.pts);
             selectedCurve.maxima = GraphUtils.findTurnPts(selectedCurve.pts, 'maxima');
             selectedCurve.minima = GraphUtils.findTurnPts(selectedCurve.pts, 'minima');
-            importantPoints.push.apply(importantPoints, selectedCurve.endPt);
-            importantPoints.push.apply(importantPoints, selectedCurve.maxima);
-            importantPoints.push.apply(importantPoints, selectedCurve.minima);
+            importantPoints.push(...selectedCurve.endPts);
+            importantPoints.push(...selectedCurve.maxima);
+            importantPoints.push(...selectedCurve.minima);
             importantPoints.sort(function(a, b){return a[0] - b[0]});
 
             // maxima and minima are treated in slightly different ways
             if (this.isMaxima) {
-                this.curves[this.clickedCurve] = GraphUtils.stretchTurningPoint(importantPoints, e, selectedCurve, this.isMaxima, this.clickedKnotId, this.prevMousePt, this.canvasProperties);
+                const curve = GraphUtils.stretchTurningPoint(importantPoints, e, selectedCurve, this.isMaxima, this.clickedKnotId, this.prevMousePt, this.canvasProperties);
+                if (isDefined(curve)) {
+                    this.curves[this.clickedCurve] = curve;
+                }
             }
 
             this.reDraw();
@@ -710,7 +708,7 @@ export class GraphSketcher {
                     this.drawnPts[this.drawnPts.length - 1][0] = this.canvasProperties.width/2;
                 }
 
-                let pts = [];
+                let pts: Point[] = [];
                 if (this.selectedLineType === LineType.BEZIER) {
                     pts = GraphUtils.bezierLineStyle(GraphUtils.sample(this.drawnPts));
                 } else if (this.selectedLineType === LineType.LINEAR) {
@@ -734,7 +732,7 @@ export class GraphSketcher {
                 curve.minY = minY;
                 curve.maxY = maxY;
 
-                curve.endPt = GraphUtils.findEndPts(pts);
+                curve.endPts = GraphUtils.findEndPts(pts);
                 curve.interX = GraphUtils.findInterceptX(this.canvasProperties.height, pts);
                 curve.interY = GraphUtils.findInterceptY(this.canvasProperties.width, pts);
                 if (this.selectedLineType === LineType.BEZIER) {

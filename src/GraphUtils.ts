@@ -1,5 +1,11 @@
 import { Curve, Point } from "./GraphSketcher";
 
+// undefined|null checker and type guard all-in-wonder.
+// Why is this not in Typescript?
+export function isDefined<T>(stuff: T): stuff is NonNullable<T> {
+    return stuff !== undefined && stuff !== null
+}
+
 const SAMPLE_INTERVAL = 10;
 const numOfPts = 100;
 
@@ -334,7 +340,7 @@ export function overItem(curves: Curve[], e: any, MOUSE_DETECT_RADIUS: number, f
     return found;
 };
 
-export function findEndPts(pts: Point[]) { 
+export function findEndPts(pts: Point[]): Point[] { 
     if (pts.length == 0) return [];
 
     let ends = [];
@@ -454,6 +460,7 @@ export function findTurnPts(pts: Point[], mode: string) {
                 position = j;
             }
         }
+        if (!isDefined(position)) continue;
         if (statPts[i][1] < pts[position-5][1] && statPts[i][1] < pts[position+5][1]) {
             pot_max.push(statPts[i]);
         } else if (statPts[i][1] > pts[position-5][1] && statPts[i][1] > pts[position+5][1]) {
@@ -461,8 +468,8 @@ export function findTurnPts(pts: Point[], mode: string) {
         }
     }
 
-    let true_max = this.duplicateStationaryPts(pot_max, mode);
-    let true_min = this.duplicateStationaryPts(pot_min, mode);
+    let true_max = duplicateStationaryPts(pot_max, mode);
+    let true_min = duplicateStationaryPts(pot_min, mode);
 
     mode == 'maxima' ? turnPts = true_max : turnPts = true_min;  
     turnPts.sort(function(a, b){return a[0] - b[0]});
@@ -470,7 +477,7 @@ export function findTurnPts(pts: Point[], mode: string) {
     return turnPts;
 };
 
-export function duplicateStationaryPts(pts, mode) {
+export function duplicateStationaryPts(pts: Point[], mode: string) {
     let non_duplicates = []
     for (let i = 0; i < pts.length; i++) {
         let similar_ind = [pts[i]]
@@ -492,7 +499,7 @@ export function duplicateStationaryPts(pts, mode) {
 };
 
 // given a curve, translate the curve
-export function translateCurve(curve, dx, dy, canvasProperties) {
+export function translateCurve(curve: Curve, dx: number, dy: number, canvasProperties: { width: any; height: any; }) {
     let pts = curve.pts;
 
     curve.minX += dx;
@@ -505,7 +512,7 @@ export function translateCurve(curve, dx, dy, canvasProperties) {
         pts[i][1] += dy;
     }
 
-    function moveTurnPts(knots) {
+    function moveTurnPts(knots: Point[]) {
         for (let i = 0; i < knots.length; i++) {
             let knot = knots[i];
 
@@ -521,55 +528,57 @@ export function translateCurve(curve, dx, dy, canvasProperties) {
     moveTurnPts(minima);
 
 
-    let moveInter = function(inter, newInter) {
+    let moveInter = function(inter: Point[], newInter: Point[]) {
         for (let i = 0; i < inter.length; i++) {
-            if (inter[i].symbol != undefined) {
-                let symbol = inter[i].symbol;
+            // if (inter[i].symbol != undefined) {
+            //     let symbol = inter[i].symbol;
 
-                let found = false,
-                    min = 50,
-                    knot;
-                for (let j = 0; j < newInter.length; j++) {
-                    if (this.getDist(inter[i], newInter[j]) < min) {
-                        min = this.getDist(inter[i], newInter[j]);
-                        knot = newInter[j];
-                        found = true;
-                    }
-                }
+            //     let found = false,
+            //         min = 50,
+            //         knot;
+            //     for (let j = 0; j < newInter.length; j++) {
+            //         if (getDist(inter[i], newInter[j]) < min) {
+            //             min = getDist(inter[i], newInter[j]);
+            //             knot = newInter[j];
+            //             found = true;
+            //         }
+            //     }
 
-                if (found) {
-                    symbol.x = knot[0];
-                    symbol.y = knot.y;
-                    knot.symbol = symbol;
-                } 
-            }
+            //     if (found) {
+            //         symbol.x = knot[0];
+            //         symbol.y = knot.y;
+            //         knot.symbol = symbol;
+            //     } 
+            // }
         }
         return newInter;
-    }.bind(this);
+    };
 
     let interX = curve.interX,
-        newInterX = this.findInterceptX(canvasProperties.height, pts);
+        newInterX = findInterceptX(canvasProperties.height, pts);
     curve.interX = moveInter(interX, newInterX);
 
-    let endPt = curve.endPt,
-        newEndPt = this.findEndPts(pts);
-    curve.endPt = newEndPt;
+    let endPt = curve.endPts,
+        newEndPt = findEndPts(pts);
+    curve.endPts = newEndPt;
     void endPt;
 
     let interY = curve.interY,
-        newInterY = this.findInterceptY(canvasProperties.width, pts);
+        newInterY = findInterceptY(canvasProperties.width, pts);
     curve.interY = moveInter(interY, newInterY);
 
     return;
 };
 
-export function stretchTurningPoint(importantPoints, e, selectedCurve, isMaxima, selectedPointIndex, prevMousePt, canvasProperties){
-    let mousePosition = this.getMousePt(e);
-    let tempMin = undefined;
-    let tempMax = undefined;
+export function stretchTurningPoint(importantPoints: Point[], e: MouseEvent, selectedCurve: Curve, isMaxima: boolean, selectedPointIndex: number|undefined, prevMousePt: Point, canvasProperties: { width: any; height: any; }) {
+    if (!isDefined(selectedPointIndex)) return;
+
+    let mousePosition = getMousePt(e);
+    let tempMin = [Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER];
+    let tempMax = [Number.MIN_SAFE_INTEGER, Number.MIN_SAFE_INTEGER];
     let turningPoints = isMaxima ? selectedCurve.maxima : selectedCurve.minima;
     for (let i = 0; i < importantPoints.length; i++) {
-        if (importantPoints[i] == undefined || turningPoints[selectedPointIndex] == undefined) {
+        if (!isDefined(importantPoints[i]) || !isDefined(turningPoints[selectedPointIndex])) {
             break;
         }
         if (importantPoints[i][0] == turningPoints[selectedPointIndex][0]) {
@@ -585,25 +594,25 @@ export function stretchTurningPoint(importantPoints, e, selectedCurve, isMaxima,
     if (movementWithinBoundary) {
         // to this point we get the clicked knot and the turning/end points either side, now we will split the curve into the two
         // origional max/min sides and the 2 new curves to be stretched, then combine them all after.
-        let leftStaticPoints = [];
-        let rightStaticPoints = [];
-        let leftStretchedCurve = {pts: []};
-        let rightStretchedCurve = {pts: []};
+        let leftStaticPoints = new Array<Point>();
+        let rightStaticPoints = new Array<Point>();
+        let leftStretchedCurve = new Curve;
+        let rightStretchedCurve = new Curve;
         for (let t = selectedCurve.pts.length-1; t > -1; t--) {
             if (selectedCurve.pts[t][0] > tempMax[0]) {
                 rightStaticPoints.push(selectedCurve.pts[t]);
-                selectedCurve.pts.pop(selectedCurve.pts[t]);
+                selectedCurve.pts.pop(/* selectedCurve.pts[t] */);
             } else if (selectedCurve.pts[t][0] <= tempMax[0] && selectedCurve.pts[t][0] >= turningPoints[selectedPointIndex][0]) {
                 rightStretchedCurve.pts.push(selectedCurve.pts[t]);
-                selectedCurve.pts.pop(selectedCurve.pts[t]);
+                selectedCurve.pts.pop(/* selectedCurve.pts[t] */);
             } else if (selectedCurve.pts[t][0] <= turningPoints[selectedPointIndex][0] && selectedCurve.pts[t][0] >= tempMin[0]) {
                 leftStretchedCurve.pts.push(selectedCurve.pts[t]);
-                selectedCurve.pts.pop(selectedCurve.pts[t]);
+                selectedCurve.pts.pop(/* selectedCurve.pts[t] */);
             } else if (selectedCurve.pts[t][0] < tempMin[0]) {
                 leftStaticPoints.push(selectedCurve.pts[t]);
-                selectedCurve.pts.pop(selectedCurve.pts[t]);
+                selectedCurve.pts.pop(/* selectedCurve.pts[t] */);
             } else {
-                selectedCurve.pts.pop(selectedCurve.pts[t]);
+                selectedCurve.pts.pop(/* selectedCurve.pts[t] */);
             }
         }
 
@@ -627,8 +636,8 @@ export function stretchTurningPoint(importantPoints, e, selectedCurve, isMaxima,
         let rnrx = tempMax[0] - turningPoints[selectedPointIndex][0];
         let rnry = turningPoints[selectedPointIndex][1] - tempMax[1];
 
-        this.stretchCurve(leftStretchedCurve, lorx, lory, lnrx, lnry, tempMin[0], tempMin[1], canvasProperties);    
-        this.stretchCurve(rightStretchedCurve, rorx, rory, rnrx, rnry, tempMax[0], tempMax[1], canvasProperties);
+        stretchCurve(leftStretchedCurve, lorx, lory, lnrx, lnry, tempMin[0], tempMin[1], canvasProperties);    
+        stretchCurve(rightStretchedCurve, rorx, rory, rnrx, rnry, tempMax[0], tempMax[1], canvasProperties);
                 
         turningPoints[selectedPointIndex] = mousePosition;
 
@@ -637,10 +646,10 @@ export function stretchTurningPoint(importantPoints, e, selectedCurve, isMaxima,
         selectedCurve.pts.push.apply(selectedCurve.pts, rightStretchedCurve.pts);
         selectedCurve.pts.push.apply(selectedCurve.pts, rightStaticPoints);
 
-        selectedCurve.interX = this.findInterceptX(canvasProperties.height, selectedCurve.pts);
-        selectedCurve.interY = this.findInterceptY(canvasProperties.width, selectedCurve.pts);
-        selectedCurve.maxima = this.findTurnPts(selectedCurve.pts, 'maxima');
-        selectedCurve.minima = this.findTurnPts(selectedCurve.pts, 'minima');
+        selectedCurve.interX = findInterceptX(canvasProperties.height, selectedCurve.pts);
+        selectedCurve.interY = findInterceptY(canvasProperties.width, selectedCurve.pts);
+        selectedCurve.maxima = findTurnPts(selectedCurve.pts, 'maxima');
+        selectedCurve.minima = findTurnPts(selectedCurve.pts, 'minima');
         let minX = selectedCurve.pts[0][0];
         let maxX = selectedCurve.pts[0][0];
         let minY = selectedCurve.pts[0][1];
@@ -659,9 +668,9 @@ export function stretchTurningPoint(importantPoints, e, selectedCurve, isMaxima,
     return selectedCurve;
 };
 
-export function stretchCurve(c, orx, ory, nrx, nry, baseX, baseY, canvasProperties) {
+export function stretchCurve(c: Curve, orx: number, ory: number, nrx: number, nry: number, baseX: number, baseY: number, canvasProperties: { width: any; height: any; }) {
 
-    function stretch(pt) {
+    function stretch(pt: Point) {
         let nx = (pt[0] - baseX) / orx;
         let ny = (pt[1] - baseY) / ory;
         pt[0] = nx * nrx + baseX;
@@ -675,7 +684,7 @@ export function stretchCurve(c, orx, ory, nrx, nry, baseX, baseY, canvasProperti
     }
 
 
-    function loop1(knots) {
+    function loop1(knots: Point[]) {
         if (knots != undefined) {
             for (let j = 0; j < knots.length; j++) {
                 let knot = knots[j];
@@ -685,7 +694,7 @@ export function stretchCurve(c, orx, ory, nrx, nry, baseX, baseY, canvasProperti
         }
     }
 
-    c.endPt = this.findEndPts(pts)
+    c.endPts = findEndPts(pts);
 
     let maxima = c.maxima;
     loop1(maxima);
@@ -693,41 +702,42 @@ export function stretchCurve(c, orx, ory, nrx, nry, baseX, baseY, canvasProperti
     let minima = c.minima;
     loop1(minima);
 
-    let loop2 = function(inter, newInter) {
-        if (inter != undefined) {
+    let loop2 = function(inter: Point[] | undefined, newInter: Point[]) {
+        if (isDefined(inter)) {
             for (let i = 0; i < inter.length; i++) {
-                if (inter[i].symbol != undefined) {
-                    let symbol = inter[i].symbol;
+                // if (inter[i].symbol != undefined) {
+                //     let symbol = inter[i].symbol;
 
-                    let found = false,
-                        min = 50,
-                        knot;
-                    for (let j = 0; j < newInter.length; j++) {
-                        if (this.getDist(inter[i], newInter[j]) < min) {
-                            min = this.getDist(inter[i], newInter[j]);
-                            knot = newInter[j];
-                            found = true;
-                        }
-                    }
+                //     let found = false,
+                //         min = 50,
+                //         knot;
+                //     for (let j = 0; j < newInter.length; j++) {
+                //         if (this.getDist(inter[i], newInter[j]) < min) {
+                //             min = this.getDist(inter[i], newInter[j]);
+                //             knot = newInter[j];
+                //             found = true;
+                //         }
+                //     }
 
-                    if (found) {
-                        symbol.x = knot[0];
-                        symbol.y = knot[1];
-                        knot.symbol = symbol;
-                    }
-                }
+                //     if (found) {
+                //         symbol.x = knot[0];
+                //         symbol.y = knot[1];
+                //         knot.symbol = symbol;
+                //     }
+                // }
             }
             return newInter;
         }
-    }.bind(this);
+        return [[0,0]];
+    };
 
     let interX = c.interX,
-        newInterX = this.findInterceptX(canvasProperties.height, pts);
+        newInterX = findInterceptX(canvasProperties.height, pts);
     c.interX = loop2(interX, newInterX);
 
 
     let interY = c.interY,
-        newInterY = this.findInterceptY(canvasProperties.width, pts);
+        newInterY = findInterceptY(canvasProperties.width, pts);
     c.interY = loop2(interY, newInterY);
 };
 
