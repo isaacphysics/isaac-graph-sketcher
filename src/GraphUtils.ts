@@ -558,9 +558,9 @@ export function translateCurve(curve: Curve, dx: number, dy: number, canvasPrope
         newInterX = findInterceptX(canvasProperties.height, pts);
     curve.interX = moveInter(interX, newInterX);
 
-    let endPt = curve.endPts,
+    let endPt = curve.endPt,
         newEndPt = findEndPts(pts);
-    curve.endPts = newEndPt;
+    curve.endPt = newEndPt;
     void endPt;
 
     let interY = curve.interY,
@@ -694,7 +694,7 @@ export function stretchCurve(c: Curve, orx: number, ory: number, nrx: number, nr
         }
     }
 
-    c.endPts = findEndPts(pts);
+    c.endPt = findEndPts(pts);
 
     let maxima = c.maxima;
     loop1(maxima);

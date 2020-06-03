@@ -11,7 +11,7 @@ export class Curve {
     maxX: number = 0;
     minY: number = 0;
     maxY: number = 0;
-    endPts?: Point[];
+    endPt?: Point[]; // This is likely a typo, should probably be endPts, but that would require changes to the checker.
     interX: Point[] = [];
     interY: Point[] = [];
     maxima: Point[] = [];
@@ -107,6 +107,7 @@ export class GraphSketcher {
         this.canvasProperties = { width, height };
         this.graphView = new GraphView(p, width, height);
         this.previewMode = options.previewMode;
+        console.log(this.previewMode ? 'preview' : 'modal', options);
         this.curves = options.initialCurves;
     }
 
@@ -130,6 +131,7 @@ export class GraphSketcher {
         this.p.noLoop();
         this.p.cursor(this.p.ARROW);
         this.canvas = this.p.createCanvas(this.canvasProperties.width, this.canvasProperties.height);
+        console.log(this.previewMode ? 'preview' : 'modal', this.curves);
         this.reDraw();
     }
 
@@ -458,10 +460,10 @@ export class GraphSketcher {
             if (selectedCurve.pts[0][0] > selectedCurve.pts[selectedCurve.pts.length - 1][0]) {
                 selectedCurve.pts.reverse();
             }
-            selectedCurve.endPts = GraphUtils.findEndPts(selectedCurve.pts);
+            selectedCurve.endPt = GraphUtils.findEndPts(selectedCurve.pts);
             selectedCurve.maxima = GraphUtils.findTurnPts(selectedCurve.pts, 'maxima');
             selectedCurve.minima = GraphUtils.findTurnPts(selectedCurve.pts, 'minima');
-            importantPoints.push(...selectedCurve.endPts);
+            importantPoints.push(...selectedCurve.endPt);
             importantPoints.push(...selectedCurve.maxima);
             importantPoints.push(...selectedCurve.minima);
             importantPoints.sort(function(a, b){return a[0] - b[0]});
@@ -732,7 +734,7 @@ export class GraphSketcher {
                 curve.minY = minY;
                 curve.maxY = maxY;
 
-                curve.endPts = GraphUtils.findEndPts(pts);
+                curve.endPt = GraphUtils.findEndPts(pts);
                 curve.interX = GraphUtils.findInterceptX(this.canvasProperties.height, pts);
                 curve.interY = GraphUtils.findInterceptY(this.canvasProperties.width, pts);
                 if (this.selectedLineType === LineType.BEZIER) {

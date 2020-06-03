@@ -51,7 +51,7 @@ export default class GraphView {
 
         this.p.pop();
 
-        curve.endPts = graphUtils.findEndPts(curve.pts);
+        curve.endPt = graphUtils.findEndPts(curve.pts);
         // draw x intercepts, y intercepts and turning points
         this.drawKnots(curve['interX']);
         this.drawKnots(curve['interY']);
