@@ -35,13 +35,10 @@ export default class GraphView {
     }
 
     drawCurve(curve: Curve, color: number) {
-        // let chosenColor;
-        // if (color < 0) {
-        //     chosenColor = this.CURVE_COLORS[curve.colorIdx];
-        // }
+        let chosenColor = color < 0 ? this.CURVE_COLORS[curve.colorIdx] : this.CURVE_COLORS[color];
 
         this.p.push();
-        this.p.stroke(color);
+        this.p.stroke(chosenColor);
         this.p.strokeWeight(this.CURVE_STRKWEIGHT);
 
         // want to connect closest points x,y wise, not just x wise
