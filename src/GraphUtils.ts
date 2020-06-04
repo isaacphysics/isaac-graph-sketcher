@@ -15,7 +15,7 @@ export function getDist(pt1: Point, pt2: Point) {
 }
 
 // enables data to be encoded/decoded to input on reload (2nd attempt at a question etc)
-export function encodeData(trunc: boolean, canvasProperties: { width: any; height: any; }, curves: Curve[]) {
+export function encodeData(trunc: boolean, canvasProperties: { width: number; height: number; }, curves: Curve[]) {
     if (canvasProperties.width > 5000 || canvasProperties.width <= 0) {
         alert("Invalid canvasProperties.width.");
         return;

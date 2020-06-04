@@ -2,6 +2,7 @@ import p5 from 'p5';
 import GraphView from './GraphView';
 import { isDefined } from './GraphUtils';
 import * as GraphUtils from './GraphUtils';
+import _debounce from 'lodash/debounce';
 
 // TODO: Make this an actual point
 export type Point = number[];
@@ -795,7 +796,7 @@ export class GraphSketcher {
     }
 
     // equivalent to 'locally' refreshing the canvas
-    public reDraw = () => {
+    public reDraw = _debounce(() => {
         if (this.curves.length < 4) {
             this.graphView.drawBackground(this.canvasProperties.width, this.canvasProperties.height);
             this.graphView.drawCurves(this.curves);
@@ -808,7 +809,7 @@ export class GraphSketcher {
                 }
             }
         }
-    };
+    }, 250);
 }
 
 export function makeGraphSketcher(element: HTMLElement | undefined, width: number, height: number, options: { previewMode: boolean, initialCurves: Curve[] } = { previewMode: false, initialCurves: []}): { sketch?: GraphSketcher, p: p5 } {
