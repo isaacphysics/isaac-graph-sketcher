@@ -126,7 +126,11 @@ export function encodeData(trunc: boolean, canvasProperties: { width: number; he
     return data;
 };
 
-export function decodeData(data: { canvasWidth: number; canvasHeight: number; curves: Curve[]; } | undefined, width: number, height: number) {
+export function decodeData(data: { canvasWidth: number; canvasHeight: number; curves: Curve[]; } | undefined) {
+    if (!isDefined(data)) return;
+
+    const width = data.canvasWidth;
+    const height = data.canvasHeight;
 
     function denormalise(pt: Point) {
         pt[0] = pt[0] * width + width/2;
@@ -153,11 +157,9 @@ export function decodeData(data: { canvasWidth: number; canvasHeight: number; cu
         // }
     }
 
-
-    let curves = data?.curves || [];
+    let curves = [...(data?.curves || [])];
 
     for (let i = 0; i < curves.length; i++) {
-
         let pts = curves[i].pts;
         for (let j = 0; j < pts.length; j++) {
             denormalise(pts[j]);
@@ -181,7 +183,7 @@ export function decodeData(data: { canvasWidth: number; canvasHeight: number; cu
         denormalise2(minima);
     }
 
-    return;
+    return curves;
 };
 
 // TODO 'e' is probably a mouse event of some sort

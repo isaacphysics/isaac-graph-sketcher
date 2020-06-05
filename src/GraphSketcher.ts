@@ -72,7 +72,16 @@ export class GraphSketcher {
     private bindedKnot?: { [x: string]: any; };
     private symbolType?: string;
 
-    public curves: Curve[] = [];
+    private _curves?: Curve[];
+    get curves(): Curve[] | undefined {
+        return this._curves;
+    }
+    set curves(newCurves: Curve[] | undefined) {
+        console.log('this._curves =', newCurves);
+        if (isDefined(newCurves)) {
+            this._curves = GraphUtils.decodeData({ canvasWidth: this.canvasProperties.width, canvasHeight: this.canvasProperties.height, curves: newCurves });
+        }
+    }
     private clickedKnot?: number;
     private clickedKnotId?: number;
     private clickedCurve?: number;
@@ -89,7 +98,9 @@ export class GraphSketcher {
     public selectedLineType = LineType.BEZIER;
     public updateGraphSketcherState?: (state: GraphSketcherState) => void;
 
-    constructor(p: p5, width: number, height: number, options: { previewMode: boolean, initialCurves: Curve[]}) {
+    public setupDone = false;
+
+    constructor(p: p5, width: number, height: number, options: { previewMode: boolean, initialCurves?: Curve[]}) {
         this.p = p;
 
         this.p.touchStarted = this.touchStarted;
@@ -108,8 +119,8 @@ export class GraphSketcher {
         this.canvasProperties = { width, height };
         this.graphView = new GraphView(p, width, height);
         this.previewMode = options.previewMode;
-        console.log(this.previewMode ? 'preview' : 'modal', options);
         this.curves = options.initialCurves;
+        console.log('constructor ::', this.previewMode ? 'preview' : 'modal', ' :: ', this.curves);
     }
 
     // run in the beginning by p5 library
@@ -132,8 +143,9 @@ export class GraphSketcher {
         this.p.noLoop();
         this.p.cursor(this.p.ARROW);
         this.canvas = this.p.createCanvas(this.canvasProperties.width, this.canvasProperties.height);
-        console.log(this.previewMode ? 'preview' : 'modal', this.curves);
+        console.log('setup ::', this.previewMode ? 'preview' : 'modal', ' :: ', this.curves);
         this.reDraw();
+        this.setupDone = true;
     }
 
     public teardown = () => {
@@ -154,7 +166,7 @@ export class GraphSketcher {
     }
 
     private deleteSelectedCurve = () => {
-        if (isDefined(this.clickedCurveIdx)) {
+        if (isDefined(this.clickedCurveIdx) && isDefined(this.curves)) {
             let curve = (this.curves.splice(this.clickedCurveIdx, 1))[0];
             this.clickedCurveIdx = undefined;
         }
@@ -249,21 +261,23 @@ export class GraphSketcher {
             return;
         }
 
-        let found = GraphUtils.overItem(this.curves, e, this.MOUSE_DETECT_RADIUS, "notFound");
-        if (found === "overKnot") {
-            this.p.cursor(this.p.HAND);
-            return;
-        } else if ((found === "overAttachedSymbol") || (found === "overFreeSymbol") || (found === "overCurve")) {
-            // TODO: The first two can never happen, as far as I can tell...
-            this.p.cursor(this.p.MOVE);
-            return;
-        } else if (found === "notFound") {
-            this.p.cursor(this.p.CROSS);
-            this.reDraw();
+        if (isDefined(this.curves)) {
+            let found = GraphUtils.overItem(this.curves, e, this.MOUSE_DETECT_RADIUS, "notFound");
+            if (found === "overKnot") {
+                this.p.cursor(this.p.HAND);
+                return;
+            } else if ((found === "overAttachedSymbol") || (found === "overFreeSymbol") || (found === "overCurve")) {
+                // TODO: The first two can never happen, as far as I can tell...
+                this.p.cursor(this.p.MOVE);
+                return;
+            } else if (found === "notFound") {
+                this.p.cursor(this.p.CROSS);
+                this.reDraw();
+            }
         }
 
         // stretch box
-        if (isDefined(this.clickedCurveIdx)) {
+        if (isDefined(this.clickedCurveIdx) && isDefined(this.curves)) {
             let c = this.curves[this.clickedCurveIdx];
             if (mousePosition[0] >= c.minX && mousePosition[0] <= c.maxX && mousePosition[1] >= c.minY && mousePosition[1] <= c.maxY) {
                 this.p.cursor(this.p.MOVE);
@@ -337,7 +351,7 @@ export class GraphSketcher {
         this.checkPoint.curvesJSON = JSON.stringify(this.curves);
 
         // check if stretching curve
-        if (isDefined(this.clickedCurveIdx)) {
+        if (isDefined(this.clickedCurveIdx) && isDefined(this.curves)) {
             let c = this.curves[this.clickedCurveIdx];
 
             if (detect(c.minX, c.minY) || detect(c.maxX, c.minY) || detect(c.minX, c.maxY) || detect(c.maxX, c.maxY) ||
@@ -369,7 +383,7 @@ export class GraphSketcher {
             }
         }
 
-        if (this.curves.length > 0) {
+        if (isDefined(this.curves) && this.curves.length > 0) {
             for (let i = 0; i < this.curves.length; i++) {
                 let maxima = this.curves[i].maxima;
                 let minima = this.curves[i].minima;
@@ -417,6 +431,9 @@ export class GraphSketcher {
             }
         }
 
+        if (!isDefined(this.curves)) {
+            this.curves = [];
+        }
         if (this.curves.length < this.CURVE_LIMIT){
             this.action = Action.DRAW_CURVE;
         }
@@ -454,7 +471,7 @@ export class GraphSketcher {
         let mousePosition = GraphUtils.getMousePt(e);
         this.releasePt = mousePosition;
 
-        if (this.action === Action.STRETCH_POINT && isDefined(this.clickedCurve)) {
+        if (this.action === Action.STRETCH_POINT && isDefined(this.clickedCurve) && isDefined(this.curves)) {
             let selectedCurve = this.curves[this.clickedCurve];
             // we need to know the (important) ordered end and turning points
             let importantPoints: Point[] = [];
@@ -480,7 +497,7 @@ export class GraphSketcher {
             this.reDraw();
             this.prevMousePt = mousePosition;
 
-        } else if (this.action === Action.MOVE_CURVE && isDefined(this.movedCurveIdx)) {
+        } else if (this.action === Action.MOVE_CURVE && isDefined(this.movedCurveIdx) && isDefined(this.curves)) {
             this.p.cursor(this.p.MOVE);
 
             this.isTrashActive = this.isOverButton(mousePosition, this.trashButton as HTMLElement);
@@ -491,7 +508,7 @@ export class GraphSketcher {
             GraphUtils.translateCurve(this.curves[this.movedCurveIdx], dx, dy, this.canvasProperties);
             this.reDraw();
 
-        } else if (this.action === Action.STRETCH_CURVE && isDefined(this.clickedCurveIdx)) {
+        } else if (this.action === Action.STRETCH_CURVE && isDefined(this.clickedCurveIdx) && isDefined(this.curves)) {
             this.p.cursor(this.p.MOVE);
 
             let dx = mousePosition[0] - this.prevMousePt[0];
@@ -598,7 +615,7 @@ export class GraphSketcher {
 
         } else if (this.action === Action.DRAW_CURVE && this.drawnColorIdx >= 0) {
             this.p.cursor(this.p.CROSS);
-            if (this.curves.length < this.CURVE_LIMIT) {
+            if (isDefined(this.curves) && this.curves.length < this.CURVE_LIMIT) {
                 this.p.push();
                 this.p.stroke(this.graphView.CURVE_COLORS[this.drawnColorIdx]);
                 this.p.strokeWeight(this.graphView.CURVE_STRKWEIGHT);
@@ -639,13 +656,15 @@ export class GraphSketcher {
             }
 
             // check if show stretch box
-            for (let i = 0; i < this.curves.length; i++) {
-                let pts = this.curves[i].pts;
-                for (let j = 0; j < pts.length; j++) {
-                    if (GraphUtils.getDist(pts[j], mousePosition) < this.MOUSE_DETECT_RADIUS) {
-                        this.clickedCurveIdx = i;
-                        this.reDraw();
-                        return;
+            if (isDefined(this.curves)) {
+                for (let i = 0; i < this.curves.length; i++) {
+                    let pts = this.curves[i].pts;
+                    for (let j = 0; j < pts.length; j++) {
+                        if (GraphUtils.getDist(pts[j], mousePosition) < this.MOUSE_DETECT_RADIUS) {
+                            this.clickedCurveIdx = i;
+                            this.reDraw();
+                            return;
+                        }
                     }
                 }
             }
@@ -663,7 +682,7 @@ export class GraphSketcher {
             this.checkPointsUndo.push(this.checkPoint);
             this.checkPointsRedo = [];
 
-            if (this.isTrashActive && isDefined(this.movedCurveIdx)) {
+            if (this.isTrashActive && isDefined(this.movedCurveIdx) && isDefined(this.curves)) {
                 this.curves.splice(this.movedCurveIdx, 1);
                 this.clickedCurveIdx = undefined;
             }
@@ -685,7 +704,7 @@ export class GraphSketcher {
 
         } else if (this.action === Action.DRAW_CURVE) {
 
-            if (this.curves.length < this.CURVE_LIMIT){
+            if (isDefined(this.curves) && this.curves.length < this.CURVE_LIMIT){
 
                 let curve = new Curve();
 
@@ -775,11 +794,11 @@ export class GraphSketcher {
     }
 
     public windowResized = () => {
-        let data = GraphUtils.encodeData(false, this.canvasProperties, this.curves);
+        let data = GraphUtils.encodeData(false, this.canvasProperties, this.curves || []);
         this.canvasProperties.width = window.innerWidth;
         this.canvasProperties.height = window.innerHeight;
         this.p.resizeCanvas(window.innerWidth, window.innerHeight);
-        GraphUtils.decodeData(data, this.canvasProperties.width, this.canvasProperties.height);
+        GraphUtils.decodeData(data);
         this.reDraw();
     }
 
@@ -787,7 +806,7 @@ export class GraphSketcher {
         if (this.p.key === "Delete" || this.p.key === "Backspace") {
             this.checkPointsUndo.push(this.checkPoint);
             this.checkPointsRedo = [];
-            if (isDefined(this.clickedCurveIdx)) {
+            if (isDefined(this.clickedCurveIdx) && isDefined(this.curves)) {
                 this.curves.splice(this.clickedCurveIdx, 1);
                 this.clickedCurveIdx = undefined;
                 this.reDraw();
@@ -797,8 +816,8 @@ export class GraphSketcher {
 
     // equivalent to 'locally' refreshing the canvas
     public reDraw = _debounce(() => {
-        if (this.curves.length < 4) {
-            this.graphView.drawBackground(this.canvasProperties.width, this.canvasProperties.height);
+        this.graphView.drawBackground(this.canvasProperties.width, this.canvasProperties.height);
+        if (isDefined(this.curves) && this.curves.length < 4) {
             this.graphView.drawCurves(this.curves);
             this.graphView.drawStretchBox(this.clickedCurveIdx, this.curves);
             if (this.updateGraphSketcherState) {
@@ -812,7 +831,7 @@ export class GraphSketcher {
     }, 250);
 }
 
-export function makeGraphSketcher(element: HTMLElement | undefined, width: number, height: number, options: { previewMode: boolean, initialCurves: Curve[] } = { previewMode: false, initialCurves: []}): { sketch?: GraphSketcher, p: p5 } {
+export function makeGraphSketcher(element: HTMLElement | undefined, width: number, height: number, options: { previewMode: boolean, initialCurves?: Curve[] } = { previewMode: false }): { sketch?: GraphSketcher, p: p5 } {
     let sketch: GraphSketcher | undefined;
     let p = new p5(instance => {
         sketch = new GraphSketcher(instance, width, height, options);
