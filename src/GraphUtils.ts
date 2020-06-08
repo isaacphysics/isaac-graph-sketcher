@@ -16,21 +16,16 @@ export function getDist(pt1: Point, pt2: Point) {
 
 // enables data to be encoded/decoded to input on reload (2nd attempt at a question etc)
 export function encodeData(trunc: boolean, canvasProperties: { width: number; height: number; }, curves: Curve[]) {
-    if (canvasProperties.width > 5000 || canvasProperties.width <= 0) {
-        alert("Invalid canvasProperties.width.");
+    if (canvasProperties.width > 5000 || canvasProperties.width <= 0 || canvasProperties.height > 5000 || canvasProperties.height <= 0) {
+        console.error("Invalid canvasProperties:", canvasProperties);
         return;
     }
 
-    if (canvasProperties.height > 5000 || canvasProperties.height <= 0) {
-        alert("Invalid canvasProperties.height.");
-        return;
-    }
-
-    const data: { canvasWidth: number, canvasHeight: number, curves: Curve[] } =  {
-        canvasWidth: canvasProperties.width,
-        canvasHeight: canvasProperties.height,
-        curves: []
-    }
+    // const data: { canvasWidth: number, canvasHeight: number, curves: Curve[] } =  {
+    //     canvasWidth: canvasProperties.width,
+    //     canvasHeight: canvasProperties.height,
+    //     curves: []
+    // }
 
     let clonedCurves = _clone(curves);
 
@@ -121,16 +116,11 @@ export function encodeData(trunc: boolean, canvasProperties: { width: number; he
         normalise2(minima);
     }
 
-    data.curves = clonedCurves;
-
-    return data;
+    return { curves: clonedCurves, canvasWidth: canvasProperties.width, canvasHeight: canvasProperties.height };
 };
 
-export function decodeData(data: { canvasWidth: number; canvasHeight: number; curves: Curve[]; } | undefined) {
-    if (!isDefined(data)) return;
-
-    const width = data.canvasWidth;
-    const height = data.canvasHeight;
+export function decodeData(data: { curves: Curve[], canvasWidth: number, canvasHeight: number }) {
+    const [width, height] = [data.canvasWidth, data.canvasHeight];
 
     function denormalise(pt: Point) {
         pt[0] = pt[0] * width + width/2;
@@ -157,37 +147,37 @@ export function decodeData(data: { canvasWidth: number; canvasHeight: number; cu
         // }
     }
 
-    let curves = [...(data?.curves || [])];
+    let clonedCurves = _clone(data.curves);
 
-    for (let i = 0; i < curves.length; i++) {
-        let pts = curves[i].pts;
+    for (let i = 0; i < clonedCurves.length; i++) {
+        let pts = clonedCurves[i].pts;
         for (let j = 0; j < pts.length; j++) {
             denormalise(pts[j]);
         }
 
-        curves[i].minX = curves[i].minX * width + width/2;
-        curves[i].maxX = curves[i].maxX * width + width/2;
-        curves[i].minY = height/2 - curves[i].minY * height;
-        curves[i].maxY = height/2 - curves[i].maxY * height;
+        clonedCurves[i].minX = clonedCurves[i].minX * width + width/2;
+        clonedCurves[i].maxX = clonedCurves[i].maxX * width + width/2;
+        clonedCurves[i].minY = height/2 - clonedCurves[i].minY * height;
+        clonedCurves[i].maxY = height/2 - clonedCurves[i].maxY * height;
 
-        let interX = curves[i].interX;
+        let interX = clonedCurves[i].interX;
         denormalise1(interX);
 
-        let interY = curves[i].interY;
+        let interY = clonedCurves[i].interY;
         denormalise1(interY);
 
-        let maxima = curves[i].maxima;
+        let maxima = clonedCurves[i].maxima;
         denormalise2(maxima);
 
-        let minima = curves[i].minima;
+        let minima = clonedCurves[i].minima;
         denormalise2(minima);
     }
 
-    return curves;
+    return { curves: clonedCurves, canvasWidth: width, canvasHeight: height };
 };
 
 // TODO 'e' is probably a mouse event of some sort
-export function detect(e: any, x: number, y: number) {
+export function detect(e: MouseEvent, x: number, y: number) {
     let mousePosition = getMousePt(e);
     return (getDist(mousePosition, createPoint(x, y)) < 5);
 };
