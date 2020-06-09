@@ -1,4 +1,4 @@
-import { Curve, Point } from "./GraphSketcher";
+import { Curve, Point, GraphSketcherState } from "./GraphSketcher";
 
 // undefined|null checker and type guard all-in-wonder.
 // Why is this not in Typescript?
@@ -15,18 +15,11 @@ export function getDist(pt1: Point, pt2: Point) {
 }
 
 // enables data to be encoded/decoded to input on reload (2nd attempt at a question etc)
-export function encodeData(trunc: boolean, canvasProperties: { width: number; height: number; }, curves: Curve[]) {
+export function encodeData(trunc: boolean, canvasProperties: { width: number; height: number; }, curves: Curve[]): GraphSketcherState | undefined {
     if (canvasProperties.width > 5000 || canvasProperties.width <= 0 || canvasProperties.height > 5000 || canvasProperties.height <= 0) {
         console.error("Invalid canvasProperties:", canvasProperties);
         return;
     }
-
-    // const data: { canvasWidth: number, canvasHeight: number, curves: Curve[] } =  {
-    //     canvasWidth: canvasProperties.width,
-    //     canvasHeight: canvasProperties.height,
-    //     curves: []
-    // }
-
     let clonedCurves = _clone(curves);
 
     // sort segments according to their left most points.
@@ -119,7 +112,7 @@ export function encodeData(trunc: boolean, canvasProperties: { width: number; he
     return { curves: clonedCurves, canvasWidth: canvasProperties.width, canvasHeight: canvasProperties.height };
 };
 
-export function decodeData(data: { curves: Curve[], canvasWidth: number, canvasHeight: number }) {
+export function decodeData(data: GraphSketcherState): GraphSketcherState {
     const [width, height] = [data.canvasWidth, data.canvasHeight];
 
     function denormalise(pt: Point) {
@@ -146,7 +139,6 @@ export function decodeData(data: { curves: Curve[], canvasWidth: number, canvasH
         //     }
         // }
     }
-
     let clonedCurves = _clone(data.curves);
 
     for (let i = 0; i < clonedCurves.length; i++) {
@@ -734,6 +726,8 @@ export function stretchCurve(c: Curve, orx: number, ory: number, nrx: number, nr
 };
 
 export function _clone(obj: any) {
-    let json = JSON.stringify(obj);
-    return JSON.parse(json);
+    if (isDefined(obj)) {
+        const json = JSON.stringify(obj);
+        return JSON.parse(json);
+    }
 };
