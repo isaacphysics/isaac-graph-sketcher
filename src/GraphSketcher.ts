@@ -77,9 +77,9 @@ export class GraphSketcher {
         return this._state;
     }
     set state(newState: GraphSketcherState) {
-        console.log(this.previewMode ? 'preview' : 'modal', 'this._state =', newState);
+        console.log(this.previewMode ? 'preview' : 'modal', 'this._state =', newState.canvasWidth, newState.canvasHeight, newState.curves?.length, newState.curves?.[0]?.pts.slice(0,2).map(p => p.join(', ')));
         if (isDefined(newState) && isDefined(newState.curves)) {
-            const state = GraphUtils.decodeData(newState);
+            const state = GraphUtils.decodeData({ curves: newState.curves, canvasWidth: this.canvasProperties.width, canvasHeight: this.canvasProperties.height });
             this._state = state;
         } else if (isDefined(newState)) {
             this._state.curves = [];
@@ -128,7 +128,7 @@ export class GraphSketcher {
         this.graphView = new GraphView(p, width, height);
         this.previewMode = options.previewMode;
         this._state = { curves: options.initialCurves, canvasWidth: width, canvasHeight: height };
-        console.log('constructor ::', this.previewMode ? 'preview' : 'modal', ' ::', this._state);
+        // console.log('constructor ::', this.previewMode ? 'preview' : 'modal', ' ::', this._state);
     }
 
     // run in the beginning by p5 library
@@ -151,7 +151,7 @@ export class GraphSketcher {
         this.p.noLoop();
         this.p.cursor(this.p.ARROW);
         this.canvas = this.p.createCanvas(this.canvasProperties.width, this.canvasProperties.height);
-        console.log('setup ::', this.previewMode ? 'preview' : 'modal', ' ::', this._state);
+        // console.log('setup       ::', this.previewMode ? 'preview' : 'modal', ' ::', this._state);
         this.reDraw();
         this.setupDone = true;
     }
@@ -823,7 +823,7 @@ export class GraphSketcher {
             this.graphView.drawStretchBox(this.clickedCurveIdx, this._state.curves);
             if (this.updateGraphSketcherState) {
                 const newState = GraphUtils.encodeData(true, this.canvasProperties, this._state.curves);
-                if (newState && !this.previewMode) {
+                if (newState/* && !this.previewMode*/) {
                     // TODO: This may be optimised in cases when the state is unlikely to have changed.
                     this.updateGraphSketcherState(newState);
                 }
