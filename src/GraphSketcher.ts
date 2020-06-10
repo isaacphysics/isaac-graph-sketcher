@@ -817,17 +817,29 @@ export class GraphSketcher {
 
     // equivalent to 'locally' refreshing the canvas
     public reDraw = () => {
+        console.log('reDraw');
         this.graphView.drawBackground(this.canvasProperties.width, this.canvasProperties.height);
         if (isDefined(this._state.curves) && this._state.curves.length < 4) {
-            this.graphView.drawCurves(this._state.curves);
-            this.graphView.drawStretchBox(this.clickedCurveIdx, this._state.curves);
             if (this.updateGraphSketcherState) {
-                const newState = GraphUtils.encodeData(true, this.canvasProperties, this._state.curves);
+                let newState;
+                if (this._state.curves.length > 0) {
+                    const curve = this._state.curves[0];
+                    if (curve.maxX < 2.0 && curve.minX > -2.0 && curve.minY < 2.0 && curve.maxY > -2.0) {
+                        newState = GraphUtils.decodeData(this._state);
+                        this._state = newState;
+                    } else {
+                        newState = GraphUtils.encodeData(true, this.canvasProperties, this._state.curves);
+                    }
+                }
                 if (newState/* && !this.previewMode*/) {
                     // TODO: This may be optimised in cases when the state is unlikely to have changed.
                     this.updateGraphSketcherState(newState);
                 }
             }
+        }
+        if (isDefined(this._state.curves) && this._state.curves.length < 4) {
+            this.graphView.drawStretchBox(this.clickedCurveIdx, this._state.curves);
+            this.graphView.drawCurves(this._state.curves);
         }
     };
 }
