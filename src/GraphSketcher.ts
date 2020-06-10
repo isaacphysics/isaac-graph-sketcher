@@ -3,8 +3,9 @@ import GraphView from './GraphView';
 import { isDefined } from './GraphUtils';
 import * as GraphUtils from './GraphUtils';
 import _debounce from 'lodash/debounce';
+import _cloneDeep from 'lodash/cloneDeep';
+import _isEqual from 'lodash/isEqual';
 
-// TODO: Make this an actual point
 export type Point = number[];
 export class Curve {
     pts: Point[] = [];
@@ -21,19 +22,15 @@ export class Curve {
 };
 
 enum Action {
-    // TODO: Check that this needs to be a string enum
-    NO_ACTION = "NO_ACTION",
-    STRETCH_CURVE = "STRETCH_CURVE",
-    STRETCH_POINT = "STRETCH_POINT",
-    MOVE_CURVE = "MOVE_CURVE",
-    DRAW_CURVE = "DRAW_CURVE",
-    MOVE_SYMBOL = "MOVE_SYMBOL"
+    NO_ACTION,
+    STRETCH_CURVE,
+    STRETCH_POINT,
+    MOVE_CURVE,
+    DRAW_CURVE,
+    MOVE_SYMBOL
 };
 
-export enum LineType {
-    BEZIER,
-    LINEAR
-};
+export enum LineType { BEZIER, LINEAR };
 
 export interface GraphSketcherState { canvasWidth: number; canvasHeight: number; curves?: Curve[] };
 
@@ -72,12 +69,12 @@ export class GraphSketcher {
     private bindedKnot?: { [x: string]: any; };
     private symbolType?: string;
 
+    private _oldState: GraphSketcherState;
     private _state: GraphSketcherState;
     get state(): GraphSketcherState {
         return this._state;
     }
     set state(newState: GraphSketcherState) {
-        console.log(this.previewMode ? 'preview' : 'modal', 'this._state =', newState.canvasWidth, newState.canvasHeight, newState.curves?.length, newState.curves?.[0]?.pts.slice(0,2).map(p => p.join(', ')));
         if (isDefined(newState) && isDefined(newState.curves)) {
             const state = GraphUtils.decodeData({ curves: newState.curves, canvasWidth: this.canvasProperties.width, canvasHeight: this.canvasProperties.height });
             this._state = state;
@@ -128,7 +125,7 @@ export class GraphSketcher {
         this.graphView = new GraphView(p, width, height);
         this.previewMode = options.previewMode;
         this._state = { curves: options.initialCurves, canvasWidth: width, canvasHeight: height };
-        // console.log('constructor ::', this.previewMode ? 'preview' : 'modal', ' ::', this._state);
+        this._oldState = _cloneDeep(this._state);
     }
 
     // run in the beginning by p5 library
@@ -151,7 +148,6 @@ export class GraphSketcher {
         this.p.noLoop();
         this.p.cursor(this.p.ARROW);
         this.canvas = this.p.createCanvas(this.canvasProperties.width, this.canvasProperties.height);
-        // console.log('setup       ::', this.previewMode ? 'preview' : 'modal', ' ::', this._state);
         this.reDraw();
         this.setupDone = true;
     }
@@ -175,7 +171,7 @@ export class GraphSketcher {
 
     private deleteSelectedCurve = () => {
         if (isDefined(this.clickedCurveIdx) && isDefined(this._state.curves)) {
-            let curve = (this._state.curves.splice(this.clickedCurveIdx, 1))[0];
+            this._state.curves.splice(this.clickedCurveIdx, 1);
             this.clickedCurveIdx = undefined;
         }
     }
@@ -817,23 +813,25 @@ export class GraphSketcher {
 
     // equivalent to 'locally' refreshing the canvas
     public reDraw = () => {
-        console.log('reDraw');
         this.graphView.drawBackground(this.canvasProperties.width, this.canvasProperties.height);
-        if (isDefined(this._state.curves) && this._state.curves.length < 4) {
-            if (this.updateGraphSketcherState) {
-                let newState;
-                if (this._state.curves.length > 0) {
-                    const curve = this._state.curves[0];
-                    if (curve.maxX < 2.0 && curve.minX > -2.0 && curve.minY < 2.0 && curve.maxY > -2.0) {
-                        newState = GraphUtils.decodeData(this._state);
-                        this._state = newState;
-                    } else {
-                        newState = GraphUtils.encodeData(true, this.canvasProperties, this._state.curves);
+        if (isDefined(this._state.curves) && this._state.curves.length < 4 && this.updateGraphSketcherState) {
+            if (this._state.curves.length > 0) {
+                const curve = this._state.curves[0];
+                if (curve.maxX < 2.0 && curve.minX > -2.0 && curve.minY < 2.0 && curve.maxY > -2.0) {
+                    // This takes in the state from the react component
+                    const newState = GraphUtils.decodeData(this._state);
+                    this._oldState = _cloneDeep(newState);
+                    this._state = _cloneDeep(newState);
+                } else {
+                    // This sends out the state to the react component
+                    // We only do this if the state has actually changed.
+                    if (!_isEqual(this._oldState.curves, this._state.curves)) {
+                        const newState = GraphUtils.encodeData(true, this.canvasProperties, this._state.curves);
+                        if (newState) {
+                            this._oldState = _cloneDeep(this._state);
+                            this.updateGraphSketcherState(newState);
+                        }
                     }
-                }
-                if (newState/* && !this.previewMode*/) {
-                    // TODO: This may be optimised in cases when the state is unlikely to have changed.
-                    this.updateGraphSketcherState(newState);
                 }
             }
         }
