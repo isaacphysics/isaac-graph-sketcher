@@ -112,7 +112,7 @@ export function encodeData(trunc: boolean, canvasProperties: { width: number; he
     return { curves: clonedCurves, canvasWidth: canvasProperties.width, canvasHeight: canvasProperties.height };
 };
 
-export function decodeData(data: GraphSketcherState): GraphSketcherState {
+export function decodeData(data: GraphSketcherState, currentWidth: number, currentHeight: number): GraphSketcherState {
     const [width, height] = [data.canvasWidth, data.canvasHeight];
 
     function denormalise(pt: Point) {

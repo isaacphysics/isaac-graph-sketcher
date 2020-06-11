@@ -76,7 +76,8 @@ export class GraphSketcher {
     }
     set state(newState: GraphSketcherState) {
         if (isDefined(newState) && isDefined(newState.curves)) {
-            const state = GraphUtils.decodeData({ curves: newState.curves, canvasWidth: this.canvasProperties.width, canvasHeight: this.canvasProperties.height });
+            // const state = GraphUtils.decodeData({ curves: newState.curves, canvasWidth: this.canvasProperties.width, canvasHeight: this.canvasProperties.height }, this.canvasProperties.width, this.canvasProperties.height);
+            const state = GraphUtils.decodeData(newState, this.canvasProperties.width, this.canvasProperties.height);
             this._state = state;
         } else if (isDefined(newState)) {
             this._state.curves = [];
@@ -795,7 +796,7 @@ export class GraphSketcher {
         this.canvasProperties.width = window.innerWidth;
         this.canvasProperties.height = window.innerHeight;
         this.p.resizeCanvas(window.innerWidth, window.innerHeight);
-        this._state = GraphUtils.decodeData(data);
+        this._state = GraphUtils.decodeData(data, this.canvasProperties.width, this.canvasProperties.height);
         this.reDraw();
     }
 
@@ -819,7 +820,7 @@ export class GraphSketcher {
                 const curve = this._state.curves[0];
                 if (curve.maxX < 2.0 && curve.minX > -2.0 && curve.minY < 2.0 && curve.maxY > -2.0) {
                     // This takes in the state from the react component
-                    const newState = GraphUtils.decodeData(this._state);
+                    const newState = GraphUtils.decodeData(this._state, this.canvasProperties.width, this.canvasProperties.height);
                     this._oldState = _cloneDeep(newState);
                     this._state = _cloneDeep(newState);
                 } else {
