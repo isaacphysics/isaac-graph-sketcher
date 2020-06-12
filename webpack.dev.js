@@ -13,7 +13,7 @@ module.exports = (_env, argv) => { return {
   module: {
     rules: [
       {
-        test: /\.jsx?$/,
+        test: /\.js$/,
         use: [
           { loader: 'babel-loader',
             options: {
@@ -29,7 +29,7 @@ module.exports = (_env, argv) => { return {
         exclude: /node_modules/
       },
       {
-        test: /\.tsx?$/,
+        test: /\.ts$/,
         use: [
           { loader: 'babel-loader',
             options: {

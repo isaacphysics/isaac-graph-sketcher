@@ -8,8 +8,8 @@
     "src"
   ],
   "scripts": {
-    "dev": "webpack --watch --mode development",
-    "build": "webpack --mode production",
+    "dev": "webpack --config webpack.dev.js --watch --mode development",
+    "build": "tsc --build && webpack --config webpack.prod.js --mode production",
     "prepublishOnly": "npm run build"
   },
   "author": "",
