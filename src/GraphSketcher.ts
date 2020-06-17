@@ -791,12 +791,14 @@ export class GraphSketcher {
 
     public windowResized = () => {
         const data = GraphUtils.encodeData(false, this.canvasProperties, this._state.curves || []);
-        if (!isDefined(data)) return;
-
-        this.canvasProperties.width = window.innerWidth;
-        this.canvasProperties.height = window.innerHeight;
-        this.p.resizeCanvas(window.innerWidth, window.innerHeight);
-        this._state = GraphUtils.decodeData(data, this.canvasProperties.width, this.canvasProperties.height);
+        if (!this.previewMode) {
+            this.canvasProperties.width = window.innerWidth;
+            this.canvasProperties.height = window.innerHeight;
+            this.p.resizeCanvas(window.innerWidth, window.innerHeight);
+        }
+        if (isDefined(data)) {
+            this._state = GraphUtils.decodeData(data, this.canvasProperties.width, this.canvasProperties.height);
+        }
         this.reDraw();
     }
 
