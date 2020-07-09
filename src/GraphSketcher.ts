@@ -56,7 +56,7 @@ export class GraphSketcher {
     // for drawing curve
     private drawnPts: Point[] = [];
     private drawnColorIdx: number = -1;
-    
+
     private prevMousePt: Point = [0,0];
 
     // for moving and stretching curve
@@ -140,10 +140,10 @@ export class GraphSketcher {
             this.trashButton = document.getElementById("graph-sketcher-ui-trash-button") as HTMLElement;
             this.trashButton.addEventListener('click', this.deleteSelectedCurve);
             this.elements.push(this.trashButton);
-            
+
             this.elements.push(document.getElementById("graph-sketcher-ui-submit-button") as HTMLElement);
             this.colorSelect = document.getElementById("graph-sketcher-ui-color-select") as HTMLSelectElement;
-            
+
             this.elements.push(this.colorSelect);
         }
         this.p.noLoop();
@@ -349,7 +349,7 @@ export class GraphSketcher {
         }
 
         function detect(x: number, y: number) {
-            return (Math.abs(mousePosition[0] - x) < 5 && Math.abs(mousePosition[1] - y) < 5);
+            return (Math.abs(mousePosition[0] - x) < 20 && Math.abs(mousePosition[1] - y) < 20);
         }
         // record down mousePosition status, may be used later for undo.
         this.checkPoint = {};
@@ -380,6 +380,8 @@ export class GraphSketcher {
                 } else {
                     this.stretchMode = "rightMiddle";
                 }
+
+                this.graphView.drawCorner(this.stretchMode || "none", c);
 
                 this.action = Action.STRETCH_CURVE;
                 this.clickedKnot = undefined;
@@ -489,7 +491,7 @@ export class GraphSketcher {
             importantPoints.sort(function(a, b){return a[0] - b[0]});
 
             // maxima and minima are treated in slightly different ways
-            if (this.isMaxima) {
+            if (isDefined(this.isMaxima)) {
                 const curve = GraphUtils.stretchTurningPoint(importantPoints, e, selectedCurve, this.isMaxima, this.clickedKnotId, this.prevMousePt, this.canvasProperties);
                 if (isDefined(curve)) {
                     this._state.curves[this.clickedCurve] = curve;
@@ -838,8 +840,10 @@ export class GraphSketcher {
                 }
             }
         }
-        if (isDefined(this._state.curves) && this._state.curves.length < 4) {
+        if (isDefined(this.clickedCurveIdx) && isDefined(this._state.curves)) {
             this.graphView.drawStretchBox(this.clickedCurveIdx, this._state.curves);
+        }
+        if (isDefined(this._state.curves) && this._state.curves.length < 4) {
             this.graphView.drawCurves(this._state.curves);
         }
     };
