@@ -26,7 +26,7 @@ export default class GraphView {
         this.canvasWidth = width;
         this.canvasHeight = height;
         this.PADDING = 0.025 * this.canvasWidth;
-    }        
+    }
 
     drawCurves(curves: Curve[], color = -1) {
         for (let i = 0; i < curves.length; i++) {
@@ -153,7 +153,8 @@ export default class GraphView {
     }
 
     drawStretchBox(idx: number | null | undefined, curves: Curve[]) {
-        if (!idx || (idx && !curves[idx])) return;
+
+        if ((!idx || (idx && !curves[idx])) && idx !== 0) return;
 
         let curve = curves[idx];
 
@@ -178,7 +179,7 @@ export default class GraphView {
         this.p.triangle((minX + maxX)/2 - 5, minY - 2, (minX + maxX)/2 + 5, minY - 2, (minX + maxX)/2, minY - 7);
         this.p.triangle((minX + maxX)/2 - 5, maxY + 2, (minX + maxX)/2 + 5, maxY + 2, (minX + maxX)/2, maxY + 7);
         this.p.triangle(minX - 2, (minY + maxY) / 2 - 5, minX - 2, (minY + maxY) / 2 + 5, minX - 7, (minY + maxY) / 2);
-        this.p.triangle(maxX + 2, (minY + maxY) / 2 - 5, maxX + 2, (minY + maxY) / 2 + 5, maxX + 7, (minY + maxY) / 2); 
+        this.p.triangle(maxX + 2, (minY + maxY) / 2 - 5, maxX + 2, (minY + maxY) / 2 + 5, maxX + 7, (minY + maxY) / 2);
         this.p.pop();
     }
 
