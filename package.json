@@ -32,7 +32,7 @@
     "webpack-dashboard": "^3.2.0"
   },
   "dependencies": {
-    "lodash": "^4.17.15",
+    "lodash": "^4.17.19",
     "p5": "1.0.0"
   },
   "browserslist": [
