@@ -60,14 +60,18 @@ module.exports = (_env, argv) => { return {
   resolve: {
     modules: [path.resolve(__dirname), 'node_modules'],
     extensions: [ '.tsx', '.ts', '.js' ],
-    alias: {
-      'p5': 'node_modules/p5/lib/p5.min.js'
-    }
+    // alias: {
+    //   'p5': 'p5/lib/p5.min.js'
+    // }
   },
   output: {
     filename: 'bundle.js',
     path: path.resolve(__dirname, 'dist'),
     library: 'isaac-graph-sketcher',
     libraryTarget: 'umd'
-  }
+  },
+  externals: [
+    /^lodash\/?.*$/,
+    /^p5\/?.*$/
+  ]
 }};
