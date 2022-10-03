@@ -284,7 +284,7 @@ export default class GraphView {
     }
 
     drawBackground(passed_width: number, passed_height: number) {
-        this.p.clear();
+        this.p.clear(0, 0, 0, 0);
         this.p.background(255);
 
         this.drawGrid(this.CURVE_STRKWEIGHT, passed_width, passed_height);
