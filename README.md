@@ -12,7 +12,7 @@ client's `package.json` like so (assuming it exists in the same directory):
     ...
 }
 ```
-You will need to run `npm run build` on this project to update the dependency when changes are made. This should hot-reload
+You will need to run `yarn run build` on this project to update the dependency when changes are made. This should hot-reload
 the client if set up as described.
 
 ## Usage
