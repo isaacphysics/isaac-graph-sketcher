@@ -14,13 +14,15 @@ export function getDist(pt1: Point, pt2: Point) {
     return Math.sqrt(Math.pow(pt1[0] - pt2[0], 2) + Math.pow(pt1[1] - pt2[1], 2));
 }
 
-// enables data to be encoded/decoded to input on reload (2nd attempt at a question etc)
+/*
+Converts all curves from absolute pixel coordinates to abstract Cartesian coordinates to decouple them from
+view changes (e.g. loading attempt on other devices, resizing of window etc.)
+ */
 export function encodeData(trunc: boolean, canvasProperties: { width: number; height: number; }, curves: Curve[]): GraphSketcherState | undefined {
     if (canvasProperties.width > 5000 || canvasProperties.width <= 0 || canvasProperties.height > 5000 || canvasProperties.height <= 0) {
         console.error("Invalid canvasProperties:", canvasProperties);
         return;
     }
-    let clonedCurves = _clone(curves);
 
     // sort segments according to their left most points.
     function compare(curve1: Curve, curve2: Curve) {
@@ -40,132 +42,93 @@ export function encodeData(trunc: boolean, canvasProperties: { width: number; he
         else return 1;
     }
 
+    function normalisePoints(points: Point[]) {
+        for (let pt of points) {
+            let x = (pt[0] - canvasProperties.width / 2) / canvasProperties.width;
+            let y = (canvasProperties.height / 2 - pt[1]) / canvasProperties.height;
+            if (trunc) {
+                pt[0] = Math.round(x * 10000) / 10000;
+                pt[1] = Math.round(y * 10000) / 10000;
+            } else {
+                pt[0] = x;
+                pt[1] = y;
+            }
+        }
+    }
+
+    let clonedCurves = _clone(curves);
     clonedCurves.sort(compare);
 
-    function normalise(pt: Point) {
-        let x = (pt[0] - canvasProperties.width/2) / canvasProperties.width;
-        let y = (canvasProperties.height/2 - pt[1]) / canvasProperties.height;
-        if (trunc) {
-            pt[0] = Math.round(x * 10000) / 10000;
-            pt[1] = Math.round(y * 10000) / 10000;
-        } else {
-            pt[0] = x;
-            pt[1] = y;
-        }
-    }
-
-    function normalise1(knots: Point[]) {
-        for (let j = 0; j < knots.length; j++) {
-            let knot = knots[j];
-            normalise(knot);
-        }
-    }
-
-    function normalise2(knots: Point[]) {
-        normalise1(knots);
-        // for (let j = 0; j < knots.length; j++) {
-        //     let knot = knots[j];
-        //     if (knot.xSymbol != undefined) {
-        //         normalise(knot.xSymbol);
-        //     }
-        //     if (knot.ySymbol != undefined) {
-        //         normalise(knot.ySymbol);
-        //     }
-        // }
-    }
-
-
-    for (let i = 0; i < clonedCurves.length; i++) {
-        let pts = clonedCurves[i].pts;
-        for (let j = 0; j < pts.length; j++) {
-            normalise(pts[j]);
-        }
+    for (let curve of clonedCurves) {
+        let pts = curve.pts;
+        normalisePoints(pts)
 
         let tmp;
+        tmp = (curve.minX - canvasProperties.width/2) / canvasProperties.width;
+        curve.minX = Math.trunc(tmp * 1000) / 1000;
 
-        tmp = (clonedCurves[i].minX - canvasProperties.width/2) / canvasProperties.width;
-        clonedCurves[i].minX = Math.trunc(tmp * 1000) / 1000;
+        tmp = (curve.maxX - canvasProperties.width/2) / canvasProperties.width;
+        curve.maxX = Math.trunc(tmp * 1000) / 1000;
 
-        tmp = (clonedCurves[i].maxX - canvasProperties.width/2) / canvasProperties.width;
-        clonedCurves[i].maxX = Math.trunc(tmp * 1000) / 1000;
+        tmp = (canvasProperties.height/2 - curve.minY) / canvasProperties.height;
+        curve.minY = Math.trunc(tmp * 1000) / 1000;
 
-        tmp = (canvasProperties.height/2 - clonedCurves[i].minY) / canvasProperties.height;
-        clonedCurves[i].minY = Math.trunc(tmp * 1000) / 1000;
+        tmp = (canvasProperties.height/2 - curve.maxY) / canvasProperties.height;
+        curve.maxY = Math.trunc(tmp * 1000) / 1000;
 
-        tmp = (canvasProperties.height/2 - clonedCurves[i].maxY) / canvasProperties.height;
-        clonedCurves[i].maxY = Math.trunc(tmp * 1000) / 1000;
+        let interX = curve.interX;
+        normalisePoints(interX);
 
+        let interY = curve.interY;
+        normalisePoints(interY);
 
-        let interX = clonedCurves[i].interX;
-        normalise1(interX);
+        let maxima = curve.maxima;
+        normalisePoints(maxima);
 
-        let interY = clonedCurves[i].interY;
-        normalise1(interY);
-
-        let maxima = clonedCurves[i].maxima;
-        normalise2(maxima);
-
-        let minima = clonedCurves[i].minima;
-        normalise2(minima);
+        let minima = curve.minima;
+        normalisePoints(minima);
     }
 
     return { curves: clonedCurves, canvasWidth: canvasProperties.width, canvasHeight: canvasProperties.height };
 };
 
+/*
+Converts all curves held in GraphSketcherState from abstract Cartesian coordinates back to absolute pixel coordinates.
+ */
 export function decodeData(data: GraphSketcherState, currentWidth: number, currentHeight: number): GraphSketcherState {
-    const [width, height] = [data.canvasWidth, data.canvasHeight];
 
-    function denormalise(pt: Point) {
-        pt[0] = pt[0] * width + width/2;
-        pt[1] = height/2 - pt[1] * height;
-    }
-
-    function denormalise1(knots: Point[]) {
-        for (let j = 0; j < knots.length; j++) {
-            let knot = knots[j];
-            denormalise(knot);
+    function denormalisePoints(points: Point[]) {
+        for (let pt of points) {
+            pt[0] = pt[0] * currentWidth + currentWidth/2;
+            pt[1] = currentHeight/2 - pt[1] * currentHeight;
         }
     }
 
-    function denormalise2(knots: Point[]) {
-        denormalise1(knots);
-        // for (let j = 0; j < knots.length; j++) {
-        //     let knot = knots[j];
-        //     if (knot.xSymbol != undefined) {
-        //         denormalise(knot.xSymbol);
-        //     }
-        //     if (knot.ySymbol != undefined) {
-        //         denormalise(knot.ySymbol);
-        //     }
-        // }
-    }
     let clonedCurves = _clone(data.curves);
 
-    for (let i = 0; i < clonedCurves.length; i++) {
-        let pts = clonedCurves[i].pts;
-        for (let j = 0; j < pts.length; j++) {
-            denormalise(pts[j]);
-        }
+    for (let curve of clonedCurves) {
+        let pts = curve.pts;
+        denormalisePoints(pts)
 
-        clonedCurves[i].minX = clonedCurves[i].minX * width + width/2;
-        clonedCurves[i].maxX = clonedCurves[i].maxX * width + width/2;
-        clonedCurves[i].minY = height/2 - clonedCurves[i].minY * height;
-        clonedCurves[i].maxY = height/2 - clonedCurves[i].maxY * height;
+        curve.minX = curve.minX * currentWidth + currentWidth/2;
+        curve.maxX = curve.maxX * currentWidth + currentWidth/2;
+        curve.minY = currentHeight/2 - curve.minY * currentHeight;
+        curve.maxY = currentHeight/2 - curve.maxY * currentHeight;
 
-        let interX = clonedCurves[i].interX;
-        denormalise1(interX);
+        let interX = curve.interX;
+        denormalisePoints(interX)
 
-        let interY = clonedCurves[i].interY;
-        denormalise1(interY);
+        let interY = curve.interY;
+        denormalisePoints(interY);
 
-        let maxima = clonedCurves[i].maxima;
-        denormalise2(maxima);
+        let maxima = curve.maxima;
+        denormalisePoints(maxima);
 
-        let minima = clonedCurves[i].minima;
-        denormalise2(minima);
+        let minima = curve.minima;
+        denormalisePoints(minima);
     }
 
-    return { curves: clonedCurves, canvasWidth: width, canvasHeight: height };
+    return { curves: clonedCurves, canvasWidth: currentWidth, canvasHeight: currentHeight };
 };
 
 // TODO 'e' is probably a mouse event of some sort
