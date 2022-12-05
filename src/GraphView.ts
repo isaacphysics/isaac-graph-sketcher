@@ -1,19 +1,18 @@
 import p5 from 'p5';
 import * as graphUtils from './GraphUtils';
-import { Curve, Point } from './GraphSketcher';
+import {CanvasProperties, Curve, Dimension, Point} from './GraphSketcher';
 
 // self explanatory drawing methods
 export default class GraphView {
 
     public p: p5;
 
-    private canvasHeight = window.innerHeight;
-    private canvasWidth = window.innerWidth;
+    private canvasProperties: CanvasProperties;
 
     private DOT_LINE_COLOR = [123];
     private DEFAULT_KNOT_COLOR = [77,77,77];
 
-    private GRID_WIDTH = 60;
+    private CELLS = 20;
     private DOT_LINE_STEP = 5;
     private PADDING: number;
 
@@ -21,11 +20,10 @@ export default class GraphView {
     public CURVE_STRKWEIGHT = 2;
     public KNOT_DETECT_COLOR = [0];
 
-    constructor(p: p5, width: number, height: number) {
+    constructor(p: p5, canvasProperties: CanvasProperties) {
         this.p = p;
-        this.canvasWidth = width;
-        this.canvasHeight = height;
-        this.PADDING = 0.025 * this.canvasWidth;
+        this.PADDING = 0.025 * canvasProperties.axisLengthPx;
+        this.canvasProperties = canvasProperties;
     }
 
     drawCurves(curves: Curve[], color = -1) {
@@ -89,7 +87,7 @@ export default class GraphView {
     }
 
     drawVerticalDotLine(x: number, begin: number, end: number) {
-        if (x < 0 || x > this.canvasWidth) {
+        if (x < 0 || x > this.canvasProperties.widthPx) {
             return;
         }
 
@@ -121,7 +119,7 @@ export default class GraphView {
     }
 
     drawHorizontalDotLine(y: number, begin: number, end: number) {
-        if (y < 0 || y > this.canvasHeight) {
+        if (y < 0 || y > this.canvasProperties.heightPx) {
             return;
         }
 
@@ -183,11 +181,22 @@ export default class GraphView {
         this.p.pop();
     }
 
-    drawHorizontalAxis(curveStrokeWeight: number, passed_width: number, passed_height: number) {
-        if (passed_width && passed_height) {
-            this.canvasHeight = passed_height;
-            this.canvasWidth = passed_width;
+    drawArrowhead(at: Point, axis: Dimension) {
+        if (axis == Dimension.Y) {
+            this.p.vertex(at[0] - 5, at[1] + 10);
+            this.p.vertex(at[0], at[1]);
+            this.p.vertex(at[0] + 5, at[1] + 10);
+        } else if (axis == Dimension.X) {
+            this.p.vertex(at[0] - 10, at[1] - 5);
+            this.p.vertex(at[0], at[1]);
+            this.p.vertex(at[0] - 10, at[1] + 5);
         }
+    }
+
+    drawHorizontalAxis(curveStrokeWeight: number) {
+        let xAxisStart: Point = [this.canvasProperties.centerPx[0] - this.canvasProperties.axisLengthPx/2 + this.PADDING, this.canvasProperties.centerPx[1]]
+        let xAxisEnd: Point = [this.canvasProperties.centerPx[0] + this.canvasProperties.axisLengthPx/2 - this.PADDING, this.canvasProperties.centerPx[1]]
+
         this.p.push();
 
         this.p.strokeWeight(curveStrokeWeight);
@@ -195,25 +204,19 @@ export default class GraphView {
         this.p.stroke(0);
         this.p.noFill();
 
-        let leftMargin = this.PADDING;
-        let rightMargin = this.canvasWidth - this.PADDING;
-
         this.p.beginShape();
-        this.p.vertex(leftMargin, this.canvasHeight/2);
-        this.p.vertex(rightMargin, this.canvasHeight / 2);
-        this.p.vertex(rightMargin - 10, this.canvasHeight / 2 - 5);
-        this.p.vertex(rightMargin, this.canvasHeight / 2);
-        this.p.vertex(rightMargin - 10, this.canvasHeight / 2 + 5);
+        this.p.vertex(xAxisStart[0], xAxisStart[1]);
+        this.p.vertex(xAxisEnd[0], xAxisEnd[1]);
+        this.drawArrowhead(xAxisEnd, Dimension.X);
         this.p.endShape();
 
         this.p.pop();
     }
 
-    drawVerticalAxis(curveStrokeWeight: number, passed_width: number, passed_height: number) {
-        if (passed_width && passed_height) {
-            this.canvasHeight = passed_height;
-            this.canvasWidth = passed_width;
-        }
+    drawVerticalAxis(curveStrokeWeight: number) {
+        let yAxisStart: Point = [this.canvasProperties.centerPx[0], this.canvasProperties.centerPx[1] - this.canvasProperties.axisLengthPx / 2 + this.PADDING]
+        let yAxisEnd: Point = [this.canvasProperties.centerPx[0], this.canvasProperties.centerPx[1] + this.canvasProperties.axisLengthPx / 2 - this.PADDING]
+
         this.p.push();
 
         this.p.strokeWeight(curveStrokeWeight);
@@ -221,25 +224,16 @@ export default class GraphView {
         this.p.stroke(0);
         this.p.noFill();
 
-        let upMargin = this.PADDING;
-        let bottomMargin = this.canvasHeight - this.PADDING;
-
         this.p.beginShape();
-        this.p.vertex(this.canvasWidth/2, bottomMargin);
-        this.p.vertex(this.canvasWidth/2, upMargin);
-        this.p.vertex(this.canvasWidth/2 - 5, upMargin + 10);
-        this.p.vertex(this.canvasWidth/2, upMargin);
-        this.p.vertex(this.canvasWidth/2 + 5, upMargin + 10);
+        this.drawArrowhead(yAxisStart, Dimension.Y);
+        this.p.vertex(yAxisStart[0], yAxisStart[1]);
+        this.p.vertex(yAxisEnd[0], yAxisEnd[1]);
         this.p.endShape();
 
         this.p.pop();
     }
 
-    drawGrid(curveStrokeWeight: number, passed_width: number, passed_height: number) {
-        if (passed_width && passed_height) {
-            this.canvasHeight = passed_height;
-            this.canvasWidth = passed_width;
-        }
+    drawGrid(curveStrokeWeight: number) {
         this.p.push();
 
         this.p.noFill();
@@ -248,23 +242,20 @@ export default class GraphView {
         this.p.stroke(240);
 
         this.p.push();
-        this.p.translate(0, this.canvasHeight / 2);
-        let num = this.canvasHeight / (this.GRID_WIDTH * 2);
-        for (let i = 0; i < num; i++) {
-            this.p.line(0, -i*this.GRID_WIDTH, this.canvasWidth, -i*this.GRID_WIDTH);
-            this.p.line(0, i*this.GRID_WIDTH, this.canvasWidth, i*this.GRID_WIDTH);
-        }
-        this.p.pop();
 
-        this.p.push();
-        this.p.translate(this.canvasWidth / 2, 0);
-        num = this.canvasWidth / (this.GRID_WIDTH * 2);
-        for (let i = 0; i < num; i++) {
-            this.p.line(-i*this.GRID_WIDTH, 0, -i*this.GRID_WIDTH, this.canvasHeight);
-            this.p.line(i*this.GRID_WIDTH, 0, i*this.GRID_WIDTH, this.canvasHeight);
-        }
-        this.p.pop();
+        // draw grid lines
+        // use top-left of drawable area as origin
+        this.p.translate(this.canvasProperties.plotStartPx[0], this.canvasProperties.plotStartPx[1]);
 
+        let cellSize = this.canvasProperties.axisLengthPx / this.CELLS;
+        for (let cellNo = 1; cellNo < this.CELLS; cellNo++) {
+            // horizontal
+            this.p.line(0, cellSize * cellNo, this.canvasProperties.axisLengthPx, cellSize * cellNo)
+            // vertical
+            this.p.line(cellSize * cellNo, 0, cellSize * cellNo, this.canvasProperties.axisLengthPx)
+        }
+
+        this.p.pop();
         this.p.pop();
     }
 
@@ -276,20 +267,22 @@ export default class GraphView {
         this.p.strokeWeight(0.5);
         this.p.fill(0);
 
-        this.p.text("O", this.canvasWidth/2 - 15, this.canvasHeight/2 + 15);
-        this.p.text("x", this.canvasWidth - this.PADDING, this.canvasHeight/2 + 15);
-        this.p.text("y", this.canvasWidth/2 + 5, this.PADDING);
+        this.p.text("O", this.canvasProperties.centerPx[0] - 15, this.canvasProperties.centerPx[1] + 15);
+        this.p.text("x", this.canvasProperties.centerPx[0] + this.canvasProperties.axisLengthPx/2 - 2 * this.PADDING, this.canvasProperties.centerPx[1] + 15);
+        this.p.text("y", this.canvasProperties.centerPx[0] + 5, this.canvasProperties.centerPx[1] - this.canvasProperties.axisLengthPx / 2 + this.PADDING);
 
         this.p.pop();
     }
 
-    drawBackground(passed_width: number, passed_height: number) {
+    drawBackground(canvasProperties: CanvasProperties) {
+        this.canvasProperties = canvasProperties;
+
         this.p.clear(0, 0, 0, 0);
         this.p.background(255);
 
-        this.drawGrid(this.CURVE_STRKWEIGHT, passed_width, passed_height);
-        this.drawHorizontalAxis(this.CURVE_STRKWEIGHT, passed_width, passed_height);
-        this.drawVerticalAxis(this.CURVE_STRKWEIGHT, passed_width, passed_height);
+        this.drawGrid(this.CURVE_STRKWEIGHT);
+        this.drawHorizontalAxis(this.CURVE_STRKWEIGHT);
+        this.drawVerticalAxis(this.CURVE_STRKWEIGHT);
         this.drawLabel();
     }
 
@@ -331,5 +324,14 @@ export default class GraphView {
             }
         }
         this.p.pop();
+    }
+
+    debugDrawCoordinates(point: Point) {
+        const plotSpaceCoordPx: Point = [point[0] - this.canvasProperties.plotStartPx[0], point[1] - this.canvasProperties.plotStartPx[1]]
+
+        this.p.push()
+        this.p.text(`Screen space: (${point[0]}, ${point[1]})\nPlot space (${plotSpaceCoordPx[0]},${plotSpaceCoordPx[1]})`,
+            point[0], point[1])
+        this.p.pop()
     }
 };

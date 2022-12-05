@@ -1,4 +1,4 @@
-import { Curve, Point, GraphSketcherState } from "./GraphSketcher";
+import {CanvasProperties, Curve, Dimension, GraphSketcherState, Point} from "./GraphSketcher";
 
 // undefined|null checker and type guard all-in-wonder.
 // Why is this not in Typescript?
@@ -18,8 +18,8 @@ export function getDist(pt1: Point, pt2: Point) {
 Converts all curves from absolute pixel coordinates to abstract Cartesian coordinates to decouple them from
 view changes (e.g. loading attempt on other devices, resizing of window etc.)
  */
-export function encodeData(trunc: boolean, canvasProperties: { width: number; height: number; }, curves: Curve[]): GraphSketcherState | undefined {
-    if (canvasProperties.width > 5000 || canvasProperties.width <= 0 || canvasProperties.height > 5000 || canvasProperties.height <= 0) {
+export function encodeData(trunc: boolean, canvasProperties: CanvasProperties, curves: Curve[]): GraphSketcherState | undefined {
+    if (canvasProperties.widthPx > 5000 || canvasProperties.widthPx <= 0 || canvasProperties.heightPx > 5000 || canvasProperties.heightPx <= 0) {
         console.error("Invalid canvasProperties:", canvasProperties);
         return;
     }
@@ -28,7 +28,7 @@ export function encodeData(trunc: boolean, canvasProperties: { width: number; he
     function compare(curve1: Curve, curve2: Curve) {
         function findMinX(pts: Point[]) {
             if (pts.length === 0) return 0;
-            let min = canvasProperties.width;
+            let min = canvasProperties.widthPx;
             for (let i = 0; i < pts.length; i++) {
                 min = Math.min(min, pts[i][0]);
             }
@@ -42,93 +42,87 @@ export function encodeData(trunc: boolean, canvasProperties: { width: number; he
         else return 1;
     }
 
-    function normalisePoints(points: Point[]) {
-        for (let pt of points) {
-            let x = (pt[0] - canvasProperties.width / 2) / canvasProperties.width;
-            let y = (canvasProperties.height / 2 - pt[1]) / canvasProperties.height;
-            if (trunc) {
-                pt[0] = Math.round(x * 10000) / 10000;
-                pt[1] = Math.round(y * 10000) / 10000;
-            } else {
-                pt[0] = x;
-                pt[1] = y;
+    function normalisePoint(point: Point, truncate: boolean): Point|null {
+        if (point) {
+            let x = normalise(point[0], Dimension.X)
+            let y = normalise(point[1], Dimension.Y)
+            if (truncate) {
+                x = Math.round(x * 10000) / 10000;
+                y = Math.round(y * 10000) / 10000;
             }
+            return createPoint(x, y)
         }
+        return null
+    }
+
+    function normalise(value: number, dimension: Dimension): number {
+        if (dimension == Dimension.X) {
+            return (value - canvasProperties.centerPx[0]) / canvasProperties.axisLengthPx;
+        }
+        else if (dimension == Dimension.Y) {
+            return (canvasProperties.centerPx[1] - value) / canvasProperties.axisLengthPx;
+        }
+        return 0
     }
 
     let clonedCurves = _clone(curves);
     clonedCurves.sort(compare);
 
     for (let curve of clonedCurves) {
-        let pts = curve.pts;
-        normalisePoints(pts)
+        curve.pts = curve.pts.map((point: Point) => normalisePoint(point, trunc))
 
-        let tmp;
-        tmp = (curve.minX - canvasProperties.width/2) / canvasProperties.width;
-        curve.minX = Math.trunc(tmp * 1000) / 1000;
+        curve.minX = curve.minX? normalise(curve.minX, Dimension.X) : null
+        curve.maxX = curve.maxX? normalise(curve.maxX, Dimension.X) : null
+        curve.minY = curve.minY? normalise(curve.minY, Dimension.Y) : null
+        curve.maxY = curve.maxY? normalise(curve.maxY, Dimension.Y) : null
 
-        tmp = (curve.maxX - canvasProperties.width/2) / canvasProperties.width;
-        curve.maxX = Math.trunc(tmp * 1000) / 1000;
-
-        tmp = (canvasProperties.height/2 - curve.minY) / canvasProperties.height;
-        curve.minY = Math.trunc(tmp * 1000) / 1000;
-
-        tmp = (canvasProperties.height/2 - curve.maxY) / canvasProperties.height;
-        curve.maxY = Math.trunc(tmp * 1000) / 1000;
-
-        let interX = curve.interX;
-        normalisePoints(interX);
-
-        let interY = curve.interY;
-        normalisePoints(interY);
-
-        let maxima = curve.maxima;
-        normalisePoints(maxima);
-
-        let minima = curve.minima;
-        normalisePoints(minima);
+        curve.interX = curve.interX.map((point: Point) => normalisePoint(point, trunc))
+        curve.interY = curve.interY.map((point: Point) => normalisePoint(point, trunc))
+        curve.maxima = curve.maxima.map((point: Point) => normalisePoint(point, trunc))
+        curve.minima = curve.minima.map((point: Point) => normalisePoint(point, trunc))
     }
 
-    return { curves: clonedCurves, canvasWidth: canvasProperties.width, canvasHeight: canvasProperties.height };
+    return { curves: clonedCurves, canvasWidth: canvasProperties.widthPx, canvasHeight: canvasProperties.heightPx };
 };
 
 /*
 Converts all curves held in GraphSketcherState from abstract Cartesian coordinates back to absolute pixel coordinates.
  */
-export function decodeData(data: GraphSketcherState, currentWidth: number, currentHeight: number): GraphSketcherState {
+export function decodeData(data: GraphSketcherState, canvasProperties: CanvasProperties): GraphSketcherState {
 
-    function denormalisePoints(points: Point[]) {
-        for (let pt of points) {
-            pt[0] = pt[0] * currentWidth + currentWidth/2;
-            pt[1] = currentHeight/2 - pt[1] * currentHeight;
+    function denormalisePoint(point: Point): Point|null {
+        if (point) {
+            return createPoint(denormalise(point[0], Dimension.X), denormalise(point[1], Dimension.Y))
         }
+        return null
+    }
+
+    function denormalise(value: number, dimension: Dimension) {
+        if (dimension == Dimension.X) {
+            return value * canvasProperties.axisLengthPx + canvasProperties.centerPx[0];
+        } else if (dimension == Dimension.Y) {
+            return canvasProperties.centerPx[1] - value * canvasProperties.axisLengthPx
+        }
+        return 0
     }
 
     let clonedCurves = _clone(data.curves);
 
     for (let curve of clonedCurves) {
-        let pts = curve.pts;
-        denormalisePoints(pts)
+        curve.pts = curve.pts.map((point: Point) => denormalisePoint(point))
 
-        curve.minX = curve.minX * currentWidth + currentWidth/2;
-        curve.maxX = curve.maxX * currentWidth + currentWidth/2;
-        curve.minY = currentHeight/2 - curve.minY * currentHeight;
-        curve.maxY = currentHeight/2 - curve.maxY * currentHeight;
+        curve.minX = curve.minX? denormalise(curve.minX, Dimension.X) : null
+        curve.maxX = curve.maxX? denormalise(curve.maxX, Dimension.X) : null
+        curve.minY = curve.minY? denormalise(curve.minY, Dimension.Y) : null
+        curve.maxY = curve.maxY? denormalise(curve.maxY, Dimension.Y) : null
 
-        let interX = curve.interX;
-        denormalisePoints(interX)
-
-        let interY = curve.interY;
-        denormalisePoints(interY);
-
-        let maxima = curve.maxima;
-        denormalisePoints(maxima);
-
-        let minima = curve.minima;
-        denormalisePoints(minima);
+        curve.interX = curve.interX.map((point: Point) => denormalisePoint(point))
+        curve.interY = curve.interY.map((point: Point) => denormalisePoint(point))
+        curve.maxima = curve.maxima.map((point: Point) => denormalisePoint(point))
+        curve.minima = curve.minima.map((point: Point) => denormalisePoint(point))
     }
 
-    return { curves: clonedCurves, canvasWidth: currentWidth, canvasHeight: currentHeight };
+    return { curves: clonedCurves, canvasWidth: canvasProperties.widthPx, canvasHeight: canvasProperties.heightPx };
 };
 
 // TODO 'e' is probably a mouse event of some sort
@@ -317,48 +311,48 @@ export function findEndPts(pts: Point[]): Point[] {
     return ends;
 };
 
-export function findInterceptX(canvasHeight: number, pts: Point[]) {
+export function findInterceptX(canvasProperties: CanvasProperties, pts: Point[]) {
     if (pts.length == 0) return [];
 
     let intercepts = [];
 
-    if (pts[0][1] == canvasHeight/2) intercepts.push(pts[0]);
+    if (pts[0][1] == canvasProperties.centerPx[1]) intercepts.push(pts[0]);
     for (let i = 1; i < pts.length; i++) {
-        if (pts[i][1] == canvasHeight/2) {
+        if (pts[i][1] == canvasProperties.centerPx[1]) {
             intercepts.push(createPoint(pts[i][0], pts[i][1]));
             continue;
         }
 
-        if ((pts[i-1][1] - canvasHeight/2) * (pts[i][1] - canvasHeight/2) < 0 && (pts[i-1][1] - pts[i][1] < Math.abs(200))) {
+        if ((pts[i-1][1] - canvasProperties.centerPx[1]) * (pts[i][1] - canvasProperties.centerPx[1]) < 0 && (pts[i-1][1] - pts[i][1] < Math.abs(200))) {
             let dx = pts[i][0] - pts[i-1][0];
             let dy = pts[i][1] - pts[i-1][1];
             let grad = dy/dx;
-            let esti = pts[i-1][0] + (1 / grad) * (canvasHeight/2 - pts[i-1][1]);
-            intercepts.push(createPoint(esti, canvasHeight/2));
+            let esti = pts[i-1][0] + (1 / grad) * (canvasProperties.centerPx[1] - pts[i-1][1]);
+            intercepts.push(createPoint(esti, canvasProperties.centerPx[1]));
         }
     }
 
     return intercepts;
 };
 
-export function findInterceptY(canvasWidth: number, pts: Point[]) {
+export function findInterceptY(canvasProperties: CanvasProperties, pts: Point[]) {
     if (pts.length == 0) return [];
 
     let intercepts = [];
 
-    if (pts[0][0] == canvasWidth/2) intercepts.push(pts[0]);
+    if (pts[0][0] == canvasProperties.centerPx[0]) intercepts.push(pts[0]);
     for (let i = 1; i < pts.length; i++) {
-        if (pts[i][0] == canvasWidth/2) {
+        if (pts[i][0] == canvasProperties.centerPx[0]) {
             intercepts.push(createPoint(pts[i][0], pts[i][1]));
             continue;
         }
 
-        if ((pts[i-1][0] - canvasWidth/2) * (pts[i][0] - canvasWidth/2) < 0 && (pts[i-1][0] - pts[i][0] < Math.abs(200))) {
+        if ((pts[i-1][0] - canvasProperties.centerPx[0]) * (pts[i][0] - canvasProperties.centerPx[0]) < 0 && (pts[i-1][0] - pts[i][0] < Math.abs(200))) {
             let dx = pts[i][0] - pts[i-1][0];
             let dy = pts[i][1] - pts[i-1][1];
             let grad = dy/dx;
-            let esti = pts[i-1][1] + grad * (canvasWidth/2 - pts[i-1][0]);
-            intercepts.push(createPoint(canvasWidth/2, esti));
+            let esti = pts[i-1][1] + grad * (canvasProperties.centerPx[0] - pts[i-1][0]);
+            intercepts.push(createPoint(canvasProperties.centerPx[0], esti));
         }
     }
 
@@ -446,7 +440,7 @@ export function duplicateStationaryPts(pts: Point[], mode: string) {
 };
 
 // given a curve, translate the curve
-export function translateCurve(curve: Curve, dx: number, dy: number, canvasProperties: { width: any; height: any; }) {
+export function translateCurve(curve: Curve, dx: number, dy: number, canvasProperties: CanvasProperties) {
     let pts = curve.pts;
 
     curve.minX += dx;
@@ -502,7 +496,7 @@ export function translateCurve(curve: Curve, dx: number, dy: number, canvasPrope
     };
 
     let interX = curve.interX,
-        newInterX = findInterceptX(canvasProperties.height, pts);
+        newInterX = findInterceptX(canvasProperties, pts);
     curve.interX = moveInter(interX, newInterX);
 
     let endPt = curve.endPt,
@@ -511,13 +505,13 @@ export function translateCurve(curve: Curve, dx: number, dy: number, canvasPrope
     void endPt;
 
     let interY = curve.interY,
-        newInterY = findInterceptY(canvasProperties.width, pts);
+        newInterY = findInterceptY(canvasProperties, pts);
     curve.interY = moveInter(interY, newInterY);
 
     return;
 };
 
-export function stretchTurningPoint(importantPoints: Point[], e: MouseEvent, selectedCurve: Curve, isMaxima: boolean, selectedPointIndex: number|undefined, prevMousePt: Point, canvasProperties: { width: any; height: any; }) {
+export function stretchTurningPoint(importantPoints: Point[], e: MouseEvent, selectedCurve: Curve, isMaxima: boolean, selectedPointIndex: number|undefined, prevMousePt: Point, canvasProperties: CanvasProperties) {
     if (!isDefined(selectedPointIndex)) return;
 
     let mousePosition = getMousePt(e);
@@ -593,8 +587,8 @@ export function stretchTurningPoint(importantPoints: Point[], e: MouseEvent, sel
         selectedCurve.pts.push.apply(selectedCurve.pts, rightStretchedCurve.pts);
         selectedCurve.pts.push.apply(selectedCurve.pts, rightStaticPoints);
 
-        selectedCurve.interX = findInterceptX(canvasProperties.height, selectedCurve.pts);
-        selectedCurve.interY = findInterceptY(canvasProperties.width, selectedCurve.pts);
+        selectedCurve.interX = findInterceptX(canvasProperties, selectedCurve.pts);
+        selectedCurve.interY = findInterceptY(canvasProperties, selectedCurve.pts);
         selectedCurve.maxima = findTurnPts(selectedCurve.pts, 'maxima');
         selectedCurve.minima = findTurnPts(selectedCurve.pts, 'minima');
         let minX = selectedCurve.pts[0][0];
@@ -615,7 +609,7 @@ export function stretchTurningPoint(importantPoints: Point[], e: MouseEvent, sel
     return selectedCurve;
 };
 
-export function stretchCurve(c: Curve, orx: number, ory: number, nrx: number, nry: number, baseX: number, baseY: number, canvasProperties: { width: any; height: any; }) {
+export function stretchCurve(c: Curve, orx: number, ory: number, nrx: number, nry: number, baseX: number, baseY: number, canvasProperties: CanvasProperties) {
 
     function stretch(pt: Point) {
         let nx = (pt[0] - baseX) / orx;
@@ -679,12 +673,12 @@ export function stretchCurve(c: Curve, orx: number, ory: number, nrx: number, nr
     };
 
     let interX = c.interX,
-        newInterX = findInterceptX(canvasProperties.height, pts);
+        newInterX = findInterceptX(canvasProperties, pts);
     c.interX = loop2(interX, newInterX);
 
 
     let interY = c.interY,
-        newInterY = findInterceptY(canvasProperties.width, pts);
+        newInterY = findInterceptY(canvasProperties, pts);
     c.interY = loop2(interY, newInterY);
 };
 

@@ -2,7 +2,6 @@ import p5 from 'p5';
 import GraphView from './GraphView';
 import { isDefined } from './GraphUtils';
 import * as GraphUtils from './GraphUtils';
-import _debounce from 'lodash/debounce';
 import _cloneDeep from 'lodash/cloneDeep';
 import _isEqual from 'lodash/isEqual';
 
@@ -19,7 +18,21 @@ export class Curve {
     maxima: Point[] = [];
     minima: Point[] = [];
     colorIdx: number = -1;
-};
+}
+
+export interface CanvasProperties {
+    widthPx: number,
+    heightPx: number,
+    axisLengthPx: number,
+    centerPx: Point,
+    plotStartPx: Point,
+    plotEndPx: Point
+}
+
+export enum Dimension {
+    X,
+    Y
+}
 
 enum Action {
     NO_ACTION,
@@ -36,10 +49,11 @@ export interface GraphSketcherState { canvasWidth: number; canvasHeight: number;
 
 export class GraphSketcher {
     private p: p5;
-    private canvasProperties: { width: number, height: number };
+    private canvasProperties: CanvasProperties;
     private graphView: GraphView;
 
     private previewMode: boolean = false;
+    private showDebugInfo: boolean = false;
 
     private checkPoint: any;
     public  checkPointsUndo: any[] = [];
@@ -76,8 +90,7 @@ export class GraphSketcher {
     }
     set state(newState: GraphSketcherState) {
         if (isDefined(newState) && isDefined(newState.curves)) {
-            // const state = GraphUtils.decodeData({ curves: newState.curves, canvasWidth: this.canvasProperties.width, canvasHeight: this.canvasProperties.height }, this.canvasProperties.width, this.canvasProperties.height);
-            const state = GraphUtils.decodeData(newState, this.canvasProperties.width, this.canvasProperties.height);
+            const state = GraphUtils.decodeData(newState, this.canvasProperties);
             this._state = state;
         } else if (isDefined(newState)) {
             this._state.curves = [];
@@ -109,6 +122,7 @@ export class GraphSketcher {
     constructor(p: p5, width: number, height: number, options: { previewMode: boolean, initialCurves?: Curve[]}) {
         this.p = p;
 
+        // todo: we could use the state pattern for these methods, as behaviour largely depends on the current Action
         this.p.touchStarted = this.touchStarted;
         this.p.mousePressed = this.mousePressed;
         this.p.touchMoved = this.touchMoved;
@@ -122,8 +136,8 @@ export class GraphSketcher {
 
         this.p.setup = this.setup;
 
-        this.canvasProperties = { width, height };
-        this.graphView = new GraphView(p, width, height);
+        this.canvasProperties = GraphSketcher.getCanvasPropertiesForResolution(width, height);
+        this.graphView = new GraphView(p, this.canvasProperties);
         this.previewMode = options.previewMode;
         this._state = { curves: options.initialCurves, canvasWidth: width, canvasHeight: height };
         this._oldState = _cloneDeep(this._state);
@@ -148,7 +162,7 @@ export class GraphSketcher {
         }
         this.p.noLoop();
         this.p.cursor(this.p.ARROW);
-        this.canvas = this.p.createCanvas(this.canvasProperties.width, this.canvasProperties.height);
+        this.canvas = this.p.createCanvas(this.canvasProperties.widthPx, this.canvasProperties.heightPx);
         this.reDraw();
         this.setupDone = true;
     }
@@ -170,6 +184,19 @@ export class GraphSketcher {
         this.trashButton?.removeEventListener('click', this.deleteSelectedCurve);
     }
 
+    private static getCanvasPropertiesForResolution(width: number, height: number): CanvasProperties {
+        return {
+            widthPx: width,
+            heightPx: height,
+            axisLengthPx: Math.min(width, height),
+            // The canvas-space center of the display (equivalent to the cartesian plot's origin)
+            centerPx: [width / 2, height / 2],
+            // The canvas-space start and end of the drawable area (top left and bottom right of cartesian plot)
+            plotStartPx: [width / 2 - Math.min(width, height) / 2, height / 2 - Math.min(width, height) / 2],
+            plotEndPx: [width / 2 + Math.min(width, height) / 2, height / 2 + Math.min(width, height) / 2]
+        }
+    }
+
     private deleteSelectedCurve = () => {
         if (isDefined(this.clickedCurveIdx) && isDefined(this._state.curves)) {
             this._state.curves.splice(this.clickedCurveIdx, 1);
@@ -177,7 +204,7 @@ export class GraphSketcher {
         }
     }
 
-    private isOverButton = (pt: Point, button: HTMLElement) => {
+    private isPointOverButton = (pt: Point, button: HTMLElement) => {
         const rect = button.getBoundingClientRect();
 
         if (rect) {
@@ -190,15 +217,22 @@ export class GraphSketcher {
         return false;
     }
 
-    // Mouse is inactive if over buttons - stops curves being drawn where they can't be seen
+    private isPointInsidePlot = (pt: Point) => {
+        return pt[0] > this.canvasProperties.plotStartPx[0]
+            && pt[0] < this.canvasProperties.plotEndPx[0]
+            && pt[1] > this.canvasProperties.plotStartPx[1]
+            && pt[1] < this.canvasProperties.plotEndPx[1]
+    }
+
+    // Mouse is inactive if over buttons or outside plot - stops curves being drawn where they can't be seen
     private isActive = (pt: Point) => {
 
-        if (!(pt[0] > 0 && pt[0] < this.canvasProperties.width && pt[1] > 0 && pt[1] < this.canvasProperties.height)) {
+        if (!this.isPointInsidePlot(pt)) {
             return false;
         }
 
         for (let i = 0; i < this.elements.length; i++) {
-            if (this.isOverButton(pt, this.elements[i])) {
+            if (this.isPointOverButton(pt, this.elements[i])) {
                 return false;
             }
         }
@@ -346,6 +380,10 @@ export class GraphSketcher {
         // this function does not react if the mouse is over buttons or outside the canvas.
         if (!this.isActive(mousePosition)) {
             return;
+        }
+
+        if (this.showDebugInfo) {
+            this.graphView.debugDrawCoordinates(mousePosition)
         }
 
         function detect(x: number, y: number) {
@@ -504,7 +542,7 @@ export class GraphSketcher {
         } else if (this.action === Action.MOVE_CURVE && isDefined(this.movedCurveIdx) && isDefined(this._state.curves)) {
             this.p.cursor(this.p.MOVE);
 
-            this.isTrashActive = this.isOverButton(mousePosition, this.trashButton as HTMLElement);
+            this.isTrashActive = this.isPointOverButton(mousePosition, this.trashButton as HTMLElement);
 
             let dx = mousePosition[0] - this.prevMousePt[0];
             let dy = mousePosition[1] - this.prevMousePt[1];
@@ -619,7 +657,7 @@ export class GraphSketcher {
 
         } else if (this.action === Action.DRAW_CURVE && this.drawnColorIdx >= 0) {
             this.p.cursor(this.p.CROSS);
-            if (isDefined(this._state.curves) && this._state.curves.length < this.CURVE_LIMIT) {
+            if (isDefined(this._state.curves) && this._state.curves.length < this.CURVE_LIMIT && this.isActive(mousePosition)) {
                 this.p.push();
                 this.p.stroke(this.graphView.CURVE_COLORS[this.drawnColorIdx]);
                 this.p.strokeWeight(this.graphView.CURVE_STRKWEIGHT);
@@ -715,17 +753,17 @@ export class GraphSketcher {
                 // scope.$apply();
 
                 // adjustment of start and end to attach to the axis automatically.
-                if (Math.abs(this.drawnPts[0][1] - this.canvasProperties.height/2) < 3) {
-                    this.drawnPts[0][1] = this.canvasProperties.height/2;
+                if (Math.abs(this.drawnPts[0][1] - this.canvasProperties.centerPx[1]) < 3) {
+                    this.drawnPts[0][1] = this.canvasProperties.centerPx[1];
                 }
-                if (Math.abs(this.drawnPts[0][0] - this.canvasProperties.width/2) < 3) {
-                    this.drawnPts[0][0] = this.canvasProperties.width/2;
+                if (Math.abs(this.drawnPts[0][0] - this.canvasProperties.centerPx[0]) < 3) {
+                    this.drawnPts[0][0] = this.canvasProperties.centerPx[0];
                 }
-                if (Math.abs(this.drawnPts[this.drawnPts.length - 1][1] - this.canvasProperties.height/2) < 3) {
-                    this.drawnPts[this.drawnPts.length - 1][1] = this.canvasProperties.height/2;
+                if (Math.abs(this.drawnPts[this.drawnPts.length - 1][1] - this.canvasProperties.centerPx[1]) < 3) {
+                    this.drawnPts[this.drawnPts.length - 1][1] = this.canvasProperties.centerPx[1];
                 }
-                if (Math.abs(this.drawnPts[this.drawnPts.length - 1][0] - this.canvasProperties.width/2) < 3) {
-                    this.drawnPts[this.drawnPts.length - 1][0] = this.canvasProperties.width/2;
+                if (Math.abs(this.drawnPts[this.drawnPts.length - 1][0] - this.canvasProperties.centerPx[0]) < 3) {
+                    this.drawnPts[this.drawnPts.length - 1][0] = this.canvasProperties.centerPx[0];
                 }
 
                 let pts: Point[] = [];
@@ -753,8 +791,8 @@ export class GraphSketcher {
                 curve.maxY = maxY;
 
                 curve.endPt = GraphUtils.findEndPts(pts);
-                curve.interX = GraphUtils.findInterceptX(this.canvasProperties.height, pts);
-                curve.interY = GraphUtils.findInterceptY(this.canvasProperties.width, pts);
+                curve.interX = GraphUtils.findInterceptX(this.canvasProperties, pts);
+                curve.interY = GraphUtils.findInterceptY(this.canvasProperties, pts);
                 if (this.selectedLineType === LineType.BEZIER) {
                     curve.maxima = GraphUtils.findTurnPts(pts, 'maxima');
                     curve.minima = GraphUtils.findTurnPts(pts, 'minima');
@@ -794,12 +832,11 @@ export class GraphSketcher {
     public windowResized = () => {
         const data = GraphUtils.encodeData(false, this.canvasProperties, this._state.curves || []);
         if (!this.previewMode) {
-            this.canvasProperties.width = window.innerWidth;
-            this.canvasProperties.height = window.innerHeight;
+            this.canvasProperties = GraphSketcher.getCanvasPropertiesForResolution(window.innerWidth, window.innerHeight)
             this.p.resizeCanvas(window.innerWidth, window.innerHeight);
         }
         if (isDefined(data)) {
-            this._state = GraphUtils.decodeData(data, this.canvasProperties.width, this.canvasProperties.height);
+            this._state = GraphUtils.decodeData(data, this.canvasProperties);
         }
         this.reDraw();
     }
@@ -818,13 +855,13 @@ export class GraphSketcher {
 
     // equivalent to 'locally' refreshing the canvas
     public reDraw = () => {
-        this.graphView.drawBackground(this.canvasProperties.width, this.canvasProperties.height);
+        this.graphView.drawBackground(this.canvasProperties);
         if (isDefined(this._state.curves) && this._state.curves.length < 4 && this.updateGraphSketcherState) {
             if (this._state.curves.length > 0) {
                 const curve = this._state.curves[0];
                 if (curve.maxX < 2.0 && curve.minX > -2.0 && curve.minY < 2.0 && curve.maxY > -2.0) {
                     // This takes in the state from the react component
-                    const newState = GraphUtils.decodeData(this._state, this.canvasProperties.width, this.canvasProperties.height);
+                    const newState = GraphUtils.decodeData(this._state, this.canvasProperties);
                     this._oldState = _cloneDeep(newState);
                     this._state = _cloneDeep(newState);
                 } else {
