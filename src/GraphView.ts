@@ -268,7 +268,7 @@ export default class GraphView {
         this.p.fill(0);
 
         this.p.text("O", this.canvasProperties.centerPx[0] - 15, this.canvasProperties.centerPx[1] + 15);
-        this.p.text("x", this.canvasProperties.centerPx[0] + this.canvasProperties.axisLengthPx/2 - 2 * this.PADDING, this.canvasProperties.centerPx[1] + 15);
+        this.p.text("x", this.canvasProperties.centerPx[0] + this.canvasProperties.axisLengthPx/2 - this.PADDING, this.canvasProperties.centerPx[1] + 15);
         this.p.text("y", this.canvasProperties.centerPx[0] + 5, this.canvasProperties.centerPx[1] - this.canvasProperties.axisLengthPx / 2 + this.PADDING);
 
         this.p.pop();
