@@ -61,7 +61,7 @@ export class GraphSketcher {
 
     private CURVE_LIMIT = 3;
     private MOUSE_DETECT_RADIUS = 10;
-    private REQUIRED_CURVE_ON_SCREEN_RATIO = 0.15; // 15% of a curves points must be on screen or it will be deleted
+    private REQUIRED_CURVE_ON_SCREEN_RATIO = 0.30; // 30% of a curves points must be on screen or it will be deleted
 
     // action recorder
     private action: Action = Action.NO_ACTION;
