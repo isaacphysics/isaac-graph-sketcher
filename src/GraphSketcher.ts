@@ -225,6 +225,17 @@ export class GraphSketcher {
             && pt[1] < this.canvasProperties.heightPx
     }
 
+    private isCurveOutsidePlot = (curveIdx: number) => {
+        if (!isDefined(this._state.curves)) {
+            return false;
+        }
+        // This step might be expensive, but it is necessary to prevent the user from losing curves by
+        // accident and making the questions unanswerable.
+        const curve = this._state.curves[curveIdx];
+        const points = GraphUtils.sample(curve.pts);
+        return points.filter(this.isPointInsidePlot).length < (points.length * this.REQUIRED_CURVE_ON_SCREEN_RATIO);
+    }
+
     // Mouse is inactive if over buttons or outside plot - stops curves being drawn where they can't be seen
     private isActive = (pt: Point) => {
 
@@ -725,34 +736,28 @@ export class GraphSketcher {
             this.checkPointsUndo.push(this.checkPoint);
             this.checkPointsRedo = [];
 
-            if (isDefined(this.movedCurveIdx) && isDefined(this._state.curves)) {
-                // Delete the curve if it is in the trash...
-                if (this.isTrashActive) {
-                    this._state.curves.splice(this.movedCurveIdx, 1);
-                    this.clickedCurveIdx = undefined;
-                } else {
-                    // ... or if it is mostly off screen (dictated by REQUIRED_CURVE_ON_SCREEN_RATIO)
-                    // This step might be expensive, but it is necessary to prevent the user from losing curves by
-                    // accident and making the questions unanswerable.
-                    const curve = this._state.curves[this.movedCurveIdx];
-                    const points = GraphUtils.sample(curve.pts);
-                    const curveMostlyOffScreen = points.filter(this.isPointInsidePlot).length < (points.length * this.REQUIRED_CURVE_ON_SCREEN_RATIO);
-                    if (curveMostlyOffScreen) {
-                        this._state.curves.splice(this.movedCurveIdx, 1);
-                        this.clickedCurveIdx = undefined;
-                    }
-                }
+            // Delete the curve if it is in the trash, or if it is mostly off screen
+            if (isDefined(this.movedCurveIdx) && isDefined(this._state.curves) &&
+                (this.isTrashActive || this.isCurveOutsidePlot(this.movedCurveIdx))
+            ) {
+                this._state.curves.splice(this.movedCurveIdx, 1);
+                this.clickedCurveIdx = undefined;
             }
 
             this.isTrashActive = false;
             this.reDraw();
 
-        } else if (this.action === Action.STRETCH_CURVE) {
+        } else if (this.action === Action.STRETCH_CURVE || this.action === Action.STRETCH_POINT) {
             this.checkPointsUndo.push(this.checkPoint);
             this.checkPointsRedo = [];
-        } else if (this.action === Action.STRETCH_POINT) {
-            this.checkPointsUndo.push(this.checkPoint);
-            this.checkPointsRedo = [];
+            // Delete the curve if it is mostly off screen
+            if (isDefined(this.clickedCurveIdx) && isDefined(this._state.curves) &&
+                this.isCurveOutsidePlot(this.clickedCurveIdx)
+            ) {
+                this._state.curves.splice(this.clickedCurveIdx, 1);
+                this.clickedCurveIdx = undefined;
+                this.reDraw();
+            }
         } else if (this.action === Action.DRAW_CURVE) {
 
             if (isDefined(this._state.curves) && this._state.curves.length < this.CURVE_LIMIT){
