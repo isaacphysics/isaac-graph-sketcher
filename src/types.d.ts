@@ -1,6 +1,10 @@
 import p5 from 'p5';
 import { Point, Curve } from './GraphSketcher';
 
+// FIXME this file is completely pointless at the moment, but we should use it to
+//  declare types so the final library can just consist of a single bundled .js file
+//  and a .d.ts file
+
 declare module "GraphView" {
     export class GraphView {
         constructor(p: p5, width: number, height: number);

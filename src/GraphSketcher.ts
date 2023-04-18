@@ -60,7 +60,7 @@ export class GraphSketcher {
     public  checkPointsRedo: any[] = [];
 
     private CURVE_LIMIT = 3;
-    private MOUSE_DETECT_RADIUS = 10;
+    private MOUSE_DETECT_RADIUS = 20;
 
     // action recorder
     private action: Action = Action.NO_ACTION;
