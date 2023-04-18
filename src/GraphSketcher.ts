@@ -61,6 +61,7 @@ export class GraphSketcher {
 
     private CURVE_LIMIT = 3;
     private MOUSE_DETECT_RADIUS = 10;
+    private REQUIRED_CURVE_ON_SCREEN_RATIO = 0.15; // 15% of a curves points must be on screen or it will be deleted
 
     // action recorder
     private action: Action = Action.NO_ACTION;
@@ -218,10 +219,10 @@ export class GraphSketcher {
     }
 
     private isPointInsidePlot = (pt: Point) => {
-        return pt[0] > this.canvasProperties.plotStartPx[0]
-            && pt[0] < this.canvasProperties.plotEndPx[0]
-            && pt[1] > this.canvasProperties.plotStartPx[1]
-            && pt[1] < this.canvasProperties.plotEndPx[1]
+        return pt[0] > 0
+            && pt[0] < this.canvasProperties.widthPx
+            && pt[1] > 0
+            && pt[1] < this.canvasProperties.heightPx
     }
 
     // Mouse is inactive if over buttons or outside plot - stops curves being drawn where they can't be seen
@@ -724,9 +725,23 @@ export class GraphSketcher {
             this.checkPointsUndo.push(this.checkPoint);
             this.checkPointsRedo = [];
 
-            if (this.isTrashActive && isDefined(this.movedCurveIdx) && isDefined(this._state.curves)) {
-                this._state.curves.splice(this.movedCurveIdx, 1);
-                this.clickedCurveIdx = undefined;
+            if (isDefined(this.movedCurveIdx) && isDefined(this._state.curves)) {
+                // Delete the curve if it is in the trash...
+                if (this.isTrashActive) {
+                    this._state.curves.splice(this.movedCurveIdx, 1);
+                    this.clickedCurveIdx = undefined;
+                } else {
+                    // ... or if it is mostly off screen (dictated by REQUIRED_CURVE_ON_SCREEN_RATIO)
+                    // This step might be expensive, but it is necessary to prevent the user from losing curves by
+                    // accident and making the questions unanswerable.
+                    const curve = this._state.curves[this.movedCurveIdx];
+                    const points = GraphUtils.sample(curve.pts);
+                    const curveMostlyOffScreen = points.filter(this.isPointInsidePlot).length < (points.length * this.REQUIRED_CURVE_ON_SCREEN_RATIO);
+                    if (curveMostlyOffScreen) {
+                        this._state.curves.splice(this.movedCurveIdx, 1);
+                        this.clickedCurveIdx = undefined;
+                    }
+                }
             }
 
             this.isTrashActive = false;
