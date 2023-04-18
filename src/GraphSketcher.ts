@@ -156,6 +156,7 @@ export class GraphSketcher {
             this.elements.push(this.trashButton);
 
             this.elements.push(document.getElementById("graph-sketcher-ui-submit-button") as HTMLElement);
+            this.elements.push(document.getElementById("graph-sketcher-ui-help-button") as HTMLElement);
             this.colorSelect = document.getElementById("graph-sketcher-ui-color-select") as HTMLSelectElement;
 
             this.elements.push(this.colorSelect);
