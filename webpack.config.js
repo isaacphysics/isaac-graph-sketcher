@@ -1,7 +1,7 @@
 const path = require('path');
 
 module.exports = (_env, argv) => { return {
-  entry: './dist/src/GraphSketcher.js',
+  entry: './src/GraphSketcher.ts',
   devtool: false,
   optimization: {
     usedExports: true,
@@ -59,7 +59,7 @@ module.exports = (_env, argv) => { return {
   },
   output: {
     filename: 'bundle.js',
-    path: path.resolve(__dirname, 'dist'),
+    path: path.resolve(__dirname, 'lib'),
     library: {
       name: 'isaac-graph-sketcher',
       type: 'umd',

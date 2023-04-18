@@ -161,6 +161,7 @@ export function linearLineStyle(pts: Point[]) {
 export function bezierLineStyle(pts: Point[]) {
 
     // See https://github.com/josdejong/mathjs/blob/v5.8.0/src/function/probability/product.js
+    // Product of all integers between i and n
     let product = function(i: number, n: number): number {
         let half;
         if (n < i) {
@@ -173,24 +174,22 @@ export function bezierLineStyle(pts: Point[]) {
         return product(i, half) * product(half + 1, n);
     }
 
-        // See https://github.com/josdejong/mathjs/blob/v5.8.0/src/function/probability/combinations.js
+    // See https://github.com/josdejong/mathjs/blob/v5.8.0/src/function/probability/combinations.js
+    // Compute the number of ways of picking k unordered outcomes from n possibilities
     let combinations = function(n: number, k: number): number {
         let prodrange, nMinusk;
-
-            if (n < 0 || k < 0) {
+        if (n < 0 || k < 0) {
             throw new TypeError('Positive integer value expected in function combinations');
         }
         if (k > n) {
             throw new TypeError('k must be less than or equal to n');
         }
-
-            nMinusk = n - k;
-
-            if (k < nMinusk) {
+        nMinusk = n - k;
+        if (k < nMinusk) {
             prodrange = product(nMinusk + 1, n);
             return prodrange / product(1, k);
         }
-        prodrange = product(k + 1, n)
+        prodrange = product(k + 1, n);
         return prodrange / product(1, nMinusk);
     }
 
