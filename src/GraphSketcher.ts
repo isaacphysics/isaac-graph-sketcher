@@ -1,6 +1,6 @@
 import p5 from 'p5';
 import GraphView from './GraphView';
-import { isDefined } from './GraphUtils';
+import {getCombinableEndPts, isDefined} from './GraphUtils';
 import * as GraphUtils from './GraphUtils';
 import _cloneDeep from 'lodash/cloneDeep';
 import _isEqual from 'lodash/isEqual';
@@ -79,6 +79,7 @@ export class GraphSketcher {
     private stretchMode?: string;
     private isMaxima?: boolean;
     private outOfBoundsCurvePoint?: Point;
+    private possibleCombinationSpec?: [number, number, number]; // [static curve index, dragging curve end point index, static curve end point index]
 
     // for moving symbols
     private movedSymbol?: null; // TODO: WTF is this?
@@ -400,6 +401,7 @@ export class GraphSketcher {
         this.movedCurveIdx = undefined;
         this.prevMousePt = [0,0];
         this.outOfBoundsCurvePoint = undefined;
+        this.possibleCombinationSpec = undefined;
 
         let mousePosition = GraphUtils.getMousePt(e);
         this.releasePt = mousePosition;
@@ -580,6 +582,36 @@ export class GraphSketcher {
             GraphUtils.translateCurve(this._state.curves[this.movedCurveIdx], dx, dy, this.canvasProperties);
             this.outOfBoundsCurvePoint = this.isCurveOutsidePlot(this.movedCurveIdx) ? this.getAveragePoint(this._state.curves[this.movedCurveIdx].pts) : undefined;
             this.reDraw();
+
+            // Check if endpoints are close to endpoints of other curves of the same color
+            const currentCurve = this._state.curves[this.movedCurveIdx];
+            this.possibleCombinationSpec = undefined;
+            curveLoop:
+            for (let i = 0; i < this._state.curves.length; i++) {
+                if (this.movedCurveIdx === i || this._state.curves[i].colorIdx !== currentCurve.colorIdx) continue;
+                // Check each pair of end points
+                const otherCurve = this._state.curves[i];
+                if (!isDefined(currentCurve.endPt) || !isDefined(otherCurve.endPt)) continue;
+                for (let cepIdx = 0; cepIdx < currentCurve.endPt.length; cepIdx++) {
+                    for (let oepIdx = 0; oepIdx < otherCurve.endPt.length; oepIdx++) {
+                        const endPt = currentCurve.endPt[cepIdx];
+                        const otherEndPt = otherCurve.endPt[oepIdx];
+                        const possibleCombinationEndPts = GraphUtils.getCombinableEndPts(currentCurve, otherCurve, cepIdx, oepIdx);
+                        if (possibleCombinationEndPts) {
+                            this.possibleCombinationSpec = [i, possibleCombinationEndPts[0], possibleCombinationEndPts[1]];
+                            // Draw a dashed line between the two curves
+                            this.p.push();
+                            this.p.stroke(this.graphView.CURVE_COLORS[currentCurve.colorIdx]);
+                            this.p.strokeWeight(1);
+                            this.p.drawingContext.setLineDash([5, 5]);
+                            this.p.line(endPt[0], endPt[1], otherEndPt[0], otherEndPt[1]);
+                            this.p.pop();
+                            // Break outermost loop
+                            break curveLoop;
+                        }
+                    }
+                }
+            }
 
         } else if (this.action === Action.STRETCH_CURVE && isDefined(this.clickedCurveIdx) && isDefined(this._state.curves)) {
             this.p.cursor(this.p.MOVE);
@@ -766,8 +798,20 @@ export class GraphSketcher {
                 this.clickedCurveIdx = undefined;
             }
 
+            // If we have a possible combination of two curves, try to combine them
+            if (isDefined(this.movedCurveIdx) && isDefined(this._state.curves) && isDefined(this.possibleCombinationSpec)) {
+                const otherCurve = this._state.curves[this.possibleCombinationSpec[0]];
+                const combinedCurve = GraphUtils.combineCurves(this._state.curves[this.movedCurveIdx], otherCurve, this.possibleCombinationSpec[1], this.possibleCombinationSpec[2], this.canvasProperties);
+                if (combinedCurve) {
+                    this._state.curves[this.movedCurveIdx] = combinedCurve;
+                    this._state.curves.splice(this.possibleCombinationSpec[0], 1);
+                    this.clickedCurveIdx = undefined;
+                }
+            }
+
             this.isTrashActive = false;
             this.outOfBoundsCurvePoint = undefined;
+            this.possibleCombinationSpec = undefined;
             this.reDraw();
 
         } else if (this.action === Action.STRETCH_CURVE || this.action === Action.STRETCH_POINT) {
