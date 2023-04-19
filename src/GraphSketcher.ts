@@ -61,11 +61,11 @@ export class GraphSketcher {
 
     private CURVE_LIMIT = 3;
     private MOUSE_DETECT_RADIUS = 10;
-    private REQUIRED_CURVE_ON_SCREEN_RATIO = 0.30; // 30% of a curves points must be on screen or it will be deleted
+    private REQUIRED_CURVE_ON_SCREEN_RATIO = 0.50; // 50% of a curves points must be on screen or it will be deleted
 
     // action recorder
     private action: Action = Action.NO_ACTION;
-    private isMouseDragged: boolean = false ;
+    private isMouseDragged: boolean = false;
     private releasePt: Point = [0,0];
 
     // for drawing curve
@@ -78,6 +78,7 @@ export class GraphSketcher {
     private movedCurveIdx?: number;
     private stretchMode?: string;
     private isMaxima?: boolean;
+    private outOfBoundsCurvePoint?: Point;
 
     // for moving symbols
     private movedSymbol?: null; // TODO: WTF is this?
@@ -219,10 +220,14 @@ export class GraphSketcher {
     }
 
     private isPointInsidePlot = (pt: Point) => {
-        return pt[0] > 0
-            && pt[0] < this.canvasProperties.widthPx
-            && pt[1] > 0
-            && pt[1] < this.canvasProperties.heightPx
+        return pt[0] > this.canvasProperties.plotStartPx[0]
+            && pt[0] < this.canvasProperties.plotEndPx[0]
+            && pt[1] > this.canvasProperties.plotStartPx[1]
+            && pt[1] < this.canvasProperties.plotEndPx[1]
+    }
+
+    private areMostPointsOutsidePlot = (pts: Point[]) => {
+        return pts.filter(this.isPointInsidePlot).length < (pts.length * this.REQUIRED_CURVE_ON_SCREEN_RATIO);
     }
 
     private isCurveOutsidePlot = (curveIdx: number) => {
@@ -233,22 +238,29 @@ export class GraphSketcher {
         // accident and making the questions unanswerable.
         const curve = this._state.curves[curveIdx];
         const points = GraphUtils.sample(curve.pts);
-        return points.filter(this.isPointInsidePlot).length < (points.length * this.REQUIRED_CURVE_ON_SCREEN_RATIO);
+        return this.areMostPointsOutsidePlot(points);
     }
 
-    // Mouse is inactive if over buttons or outside plot - stops curves being drawn where they can't be seen
-    private isActive = (pt: Point) => {
-
-        if (!this.isPointInsidePlot(pt)) {
-            return false;
+    private getAveragePoint = (pts: Point[]): Point => {
+        // Calculate the average point
+        let avgX = 0;
+        let avgY = 0;
+        for (let i = 0; i < pts.length; i++) {
+            avgX += pts[i][0];
+            avgY += pts[i][1];
         }
+        avgX /= pts.length;
+        avgY /= pts.length;
+        return [avgX, avgY];
+    }
 
+    // Mouse is inactive if over buttons - stops curves being drawn where they can't be seen
+    private isActive = (pt: Point) => {
         for (let i = 0; i < this.elements.length; i++) {
             if (this.isPointOverButton(pt, this.elements[i])) {
                 return false;
             }
         }
-
         return true;
     }
 
@@ -373,6 +385,8 @@ export class GraphSketcher {
     private mousePressed = (e: MouseEvent) => {
         if (this.previewMode) return;
 
+        e.preventDefault(); // Stops highlighting text on click and drag
+
         this.isMouseDragged = false;
         this.action = Action.NO_ACTION;
 
@@ -385,6 +399,7 @@ export class GraphSketcher {
 
         this.movedCurveIdx = undefined;
         this.prevMousePt = [0,0];
+        this.outOfBoundsCurvePoint = undefined;
 
         let mousePosition = GraphUtils.getMousePt(e);
         this.releasePt = mousePosition;
@@ -488,7 +503,8 @@ export class GraphSketcher {
             }
         }
 
-        if (isDefined(this._state.curves) && this._state.curves.length < this.CURVE_LIMIT){
+        // Does another check to make sure the mouse is inside the plot, and not just "active"
+        if (isDefined(this._state.curves) && this.isPointInsidePlot(mousePosition) && this._state.curves.length < this.CURVE_LIMIT){
             this.action = Action.DRAW_CURVE;
         }
 
@@ -520,6 +536,8 @@ export class GraphSketcher {
     // Keep actions for curve manipulation together
     private mouseDragged = (e: MouseEvent) => {
         if (this.previewMode) return;
+
+        e.preventDefault(); // Stops highlighting text on click and drag
 
         this.isMouseDragged = true;
         let mousePosition = GraphUtils.getMousePt(e);
@@ -560,6 +578,7 @@ export class GraphSketcher {
             let dy = mousePosition[1] - this.prevMousePt[1];
             this.prevMousePt = mousePosition;
             GraphUtils.translateCurve(this._state.curves[this.movedCurveIdx], dx, dy, this.canvasProperties);
+            this.outOfBoundsCurvePoint = this.isCurveOutsidePlot(this.movedCurveIdx) ? this.getAveragePoint(this._state.curves[this.movedCurveIdx].pts) : undefined;
             this.reDraw();
 
         } else if (this.action === Action.STRETCH_CURVE && isDefined(this.clickedCurveIdx) && isDefined(this._state.curves)) {
@@ -664,21 +683,24 @@ export class GraphSketcher {
                     GraphUtils.stretchCurve(currentCurve, orx, ory, nrx, ory, currentCurve.minX, (currentCurve.minY + currentCurve.maxY)/2, this.canvasProperties);
                     break;
             }
+            this.outOfBoundsCurvePoint = this.isCurveOutsidePlot(this.clickedCurveIdx) ? this.getAveragePoint(this._state.curves[this.clickedCurveIdx].pts) : undefined;
             this.reDraw();
             this.graphView.drawCorner(this.stretchMode || "none", currentCurve);
 
         } else if (this.action === Action.DRAW_CURVE && this.drawnColorIdx >= 0) {
             this.p.cursor(this.p.CROSS);
-            if (isDefined(this._state.curves) && this._state.curves.length < this.CURVE_LIMIT && this.isActive(mousePosition)) {
+            if (isDefined(this._state.curves) && this._state.curves.length < this.CURVE_LIMIT) {
+                const constrainedMouseX = this.p.constrain(mousePosition[0], this.canvasProperties.plotStartPx[0], this.canvasProperties.plotEndPx[0]);
+                const constrainedMouseY = this.p.constrain(mousePosition[1], this.canvasProperties.plotStartPx[1], this.canvasProperties.plotEndPx[1]);
                 this.p.push();
                 this.p.stroke(this.graphView.CURVE_COLORS[this.drawnColorIdx]);
                 this.p.strokeWeight(this.graphView.CURVE_STRKWEIGHT);
                 if (this.drawnPts.length > 0) {
                     let precedingPoint = this.drawnPts[this.drawnPts.length - 1];
-                    this.p.line(precedingPoint[0], precedingPoint[1], mousePosition[0], mousePosition[1]);
+                    this.p.line(precedingPoint[0], precedingPoint[1], constrainedMouseX, constrainedMouseY);
                 }
                 this.p.pop();
-                this.drawnPts.push(mousePosition);
+                this.drawnPts.push([constrainedMouseX, constrainedMouseY]);
             }
         }
     }
@@ -686,6 +708,8 @@ export class GraphSketcher {
     // Need to know where to update points to - gives final position
     private mouseReleased = (_e: MouseEvent) => {
         if (this.previewMode) return;
+
+        _e.preventDefault(); // Stops highlighting text on click and drag
 
         let mousePosition = this.releasePt;
 
@@ -737,36 +761,34 @@ export class GraphSketcher {
             this.checkPointsRedo = [];
 
             // Delete the curve if it is in the trash, or if it is mostly off screen
-            if (isDefined(this.movedCurveIdx) && isDefined(this._state.curves) &&
-                (this.isTrashActive || this.isCurveOutsidePlot(this.movedCurveIdx))
-            ) {
+            if (isDefined(this.movedCurveIdx) && isDefined(this._state.curves) && (this.isTrashActive || isDefined(this.outOfBoundsCurvePoint))) {
                 this._state.curves.splice(this.movedCurveIdx, 1);
                 this.clickedCurveIdx = undefined;
             }
 
             this.isTrashActive = false;
+            this.outOfBoundsCurvePoint = undefined;
             this.reDraw();
 
         } else if (this.action === Action.STRETCH_CURVE || this.action === Action.STRETCH_POINT) {
             this.checkPointsUndo.push(this.checkPoint);
             this.checkPointsRedo = [];
-            // Delete the curve if it is mostly off screen
-            if (isDefined(this.clickedCurveIdx) && isDefined(this._state.curves) &&
-                this.isCurveOutsidePlot(this.clickedCurveIdx)
-            ) {
+            // Delete the curve if it is has been marked as out of bounds
+            if (isDefined(this.clickedCurveIdx) && isDefined(this._state.curves) && this.outOfBoundsCurvePoint) {
                 this._state.curves.splice(this.clickedCurveIdx, 1);
                 this.clickedCurveIdx = undefined;
+                this.outOfBoundsCurvePoint = undefined;
                 this.reDraw();
             }
         } else if (this.action === Action.DRAW_CURVE) {
 
             if (isDefined(this._state.curves) && this._state.curves.length < this.CURVE_LIMIT){
 
-                let curve = new Curve();
-
-                if (GraphUtils.sample(this.drawnPts).length < 3) {
+                if (this.drawnPts.length < 3) {
+                    // If the curve is too short or mostly outside the plot, don't add it
                     return;
                 }
+                let curve = new Curve();
 
                 this.checkPointsUndo.push(this.checkPoint);
                 this.checkPointsRedo = [];
@@ -875,6 +897,8 @@ export class GraphSketcher {
 
     // equivalent to 'locally' refreshing the canvas
     public reDraw = () => {
+        // FIXME Save the background grid and axes in a graphics object inside GraphView so they don't
+        //  have to be redrawn every time - would need to be redrawn if the canvas size changes
         this.graphView.drawBackground(this.canvasProperties);
         if (isDefined(this._state.curves) && this._state.curves.length < 4 && this.updateGraphSketcherState) {
             if (this._state.curves.length > 0) {
@@ -902,6 +926,11 @@ export class GraphSketcher {
         }
         if (isDefined(this._state.curves) && this._state.curves.length < 4) {
             this.graphView.drawCurves(this._state.curves);
+        }
+        this.graphView.drawBoundaries(this.canvasProperties);
+        if (isDefined(this.outOfBoundsCurvePoint)) {
+            // Clip it to the nearest grid boundary
+            this.graphView.drawOutOfBoundsWarning(this.outOfBoundsCurvePoint, this.canvasProperties);
         }
     };
 }
