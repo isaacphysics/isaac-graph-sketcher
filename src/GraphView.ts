@@ -213,7 +213,7 @@ export default class GraphView {
         this.drawArrowhead(xAxisEnd, Dimension.X);
         this.backgroundGraphic.endShape();
 
-        this.p.pop();
+        this.backgroundGraphic.pop();
     }
 
     drawVerticalAxis(curveStrokeWeight: number) {
