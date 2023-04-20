@@ -8,8 +8,8 @@ export function isDefined<T>(stuff: T): stuff is NonNullable<T> {
 
 const SAMPLE_INTERVAL = 10;
 const numOfPts = 100;
-export const CURVE_COMBINE_ENDPOINT_DISTANCE = 100;
-export const CURVE_COMBINE_GRADIENT_THRESHOLD = 2;
+export const CURVE_COMBINE_ENDPOINT_DISTANCE = 40;
+export const CURVE_COMBINE_ANGLE_THRESHOLD = Math.PI / 8;
 
 // methods used in manipulating the graphs
 export function getDist(pt1: Point, pt2: Point) {
@@ -696,7 +696,7 @@ export function getCombinableEndPts(draggedCurve: Curve, staticCurve: Curve, dra
     }
     // Get the index of the end points inside each curves pts array
     function getEndPointIdxInPts(curve: Curve, endPtIdx: number) {
-        if (curve.pts[0][0] === curve.endPt?.[endPtIdx][0] && curve.pts[0][1] === draggedCurve.endPt?.[endPtIdx][1]) {
+        if (curve.pts[0][0] === curve.endPt?.[endPtIdx][0] && curve.pts[0][1] === curve.endPt?.[endPtIdx][1]) {
             return 0;
         } else {
             return curve.pts.length - 1;
@@ -704,25 +704,29 @@ export function getCombinableEndPts(draggedCurve: Curve, staticCurve: Curve, dra
     }
     const draggedEndPtIdxInPts = getEndPointIdxInPts(draggedCurve, draggedEndPtIdx);
     const staticEndPtIdxInPts = getEndPointIdxInPts(staticCurve, staticEndPtIdx);
-    // Calculate the gradient close to the end points of each curve
-    function getGradient(point1: Point, point2: Point) {
-        // Order points by x value so we calculate the gradient uniformly for differently oriented curves
-        const [pt1, pt2] = point1[0] < point2[0] ? [point1, point2] : [point2, point1];
-        return (pt1[1] - pt2[1]) / (pt1[0] - pt2[0]);
+    // Calculate the angle of the line between two points
+    function getAngle(point1: Point, point2: Point) {
+        // Order points by x value so we calculate the angle uniformly for differently oriented curves
+        //const [pt1, pt2] = point1[0] < point2[0] ? [point1, point2] : [point2, point1];
+        return Math.atan((point2[1] - point1[1]) / (point2[0] - point1[0]));
     }
-    function getGradientNearEndPt(curve: Curve, endPtIdx: number) {
-        const endPt = curve.pts[endPtIdx];
-        const closestPtToEnd = curve.pts[endPtIdx == 0 ? 1 : endPtIdx - 1];
-        return getGradient(endPt, closestPtToEnd);
+    function getPreEndPt(curve: Curve, endPtIdx: number) {
+        return curve.pts[endPtIdx == 0 ? 1 : endPtIdx - 1];
     }
-    const draggedEndPtGrad = getGradientNearEndPt(draggedCurve, draggedEndPtIdxInPts);
-    const staticEndPtGrad = getGradientNearEndPt(staticCurve, staticEndPtIdxInPts);
-    const gradBetweenEndPts = getGradient(draggedEndPt, staticEndPt);
-    // Make sure the average gradient of the two curves is close to the gradient between the end points
-    if ((draggedEndPtGrad + staticEndPtGrad) / 2 > gradBetweenEndPts + CURVE_COMBINE_GRADIENT_THRESHOLD || (draggedEndPtGrad + staticEndPtGrad) / 2 < gradBetweenEndPts - CURVE_COMBINE_GRADIENT_THRESHOLD) {
+    // Pre-end points are the points just before/after the end points on each curve
+    const draggedPreEndPt = getPreEndPt(draggedCurve, draggedEndPtIdxInPts);
+    const staticPreEndPt = getPreEndPt(staticCurve, staticEndPtIdxInPts);
+    
+    const draggedEndPtAngle = getAngle(draggedEndPt, draggedPreEndPt);
+    const staticEndPtAngle = getAngle(staticEndPt, staticPreEndPt);
+    const angleBetweenEndPts = getAngle(draggedEndPt, staticEndPt);
+
+    // Make sure the average gradient of the two curves is close to the gradient between the end points. This should
+    // check directionality of pre-endpoint 1, endpoint 1, endpoint 2, pre-endpoint 2 points - they should go roughly
+    // in the same direction
+    if (Math.abs(draggedEndPtAngle - staticEndPtAngle) > CURVE_COMBINE_ANGLE_THRESHOLD || Math.abs(draggedEndPtAngle - angleBetweenEndPts) > CURVE_COMBINE_ANGLE_THRESHOLD || Math.abs(staticEndPtAngle - angleBetweenEndPts) > CURVE_COMBINE_ANGLE_THRESHOLD) {
         return undefined;
     }
-    // TODO check directionality of pre-endpoint 1, endpoint 1, endpoint 2, post-endpoint 2 points - they should go roughly in the same direction
     return [draggedEndPtIdxInPts, staticEndPtIdxInPts];
 }
 
@@ -739,7 +743,7 @@ export function combineCurves(draggedCurve: Curve, staticCurve: Curve, draggedEn
         combinedCurve.pts = staticCurve.pts.slice().reverse().concat(draggedCurve.pts);
     } else if (draggedEndPtIdxInPts == draggedCurve.pts.length - 1 && staticEndPtIdxInPts == staticCurve.pts.length - 1) {
         // End of dragged curve is being glued to the end of the static curve
-        combinedCurve.pts = draggedCurve.pts.slice().reverse().concat(staticCurve.pts);
+        combinedCurve.pts = draggedCurve.pts.concat(staticCurve.pts.slice().reverse());
     } else if (draggedEndPtIdxInPts == draggedCurve.pts.length - 1 && staticEndPtIdxInPts == 0) {
         // End of dragged curve is being glued to the start of the static curve
         combinedCurve.pts = draggedCurve.pts.concat(staticCurve.pts);

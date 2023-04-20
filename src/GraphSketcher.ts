@@ -594,11 +594,11 @@ export class GraphSketcher {
                 if (!isDefined(currentCurve.endPt) || !isDefined(otherCurve.endPt)) continue;
                 for (let cepIdx = 0; cepIdx < currentCurve.endPt.length; cepIdx++) {
                     for (let oepIdx = 0; oepIdx < otherCurve.endPt.length; oepIdx++) {
-                        const endPt = currentCurve.endPt[cepIdx];
-                        const otherEndPt = otherCurve.endPt[oepIdx];
                         const possibleCombinationEndPts = GraphUtils.getCombinableEndPts(currentCurve, otherCurve, cepIdx, oepIdx);
                         if (possibleCombinationEndPts) {
                             this.possibleCombinationSpec = [i, possibleCombinationEndPts[0], possibleCombinationEndPts[1]];
+                            const endPt = currentCurve.pts[possibleCombinationEndPts[0]];
+                            const otherEndPt = otherCurve.pts[possibleCombinationEndPts[1]];
                             // Draw a dashed line between the two curves
                             this.p.push();
                             this.p.stroke(this.graphView.CURVE_COLORS[currentCurve.colorIdx]);
