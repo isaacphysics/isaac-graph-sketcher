@@ -64,6 +64,12 @@ export default class GraphView {
     }
 
     drawKnot(knot: Point, color?: number[]) {
+        // Don't draw knots that are outside the plot area
+        if (knot[0] < this.canvasProperties.plotStartPx[0] || knot[0] > this.canvasProperties.plotEndPx[0] ||
+            knot[1] < this.canvasProperties.plotStartPx[1] || knot[1] > this.canvasProperties.plotEndPx[1]
+        ) {
+            return;
+        }
         if (!color) {
             color = this.DEFAULT_KNOT_COLOR;
         }
@@ -284,6 +290,27 @@ export default class GraphView {
         this.drawHorizontalAxis(this.CURVE_STRKWEIGHT);
         this.drawVerticalAxis(this.CURVE_STRKWEIGHT);
         this.drawLabel();
+    }
+
+    drawBoundaries(canvasProperties: CanvasProperties) {
+        this.p.push();
+        this.p.noStroke();
+        this.p.fill(255, 180);
+        this.p.rect(0, 0, canvasProperties.plotStartPx[0], canvasProperties.heightPx);
+        this.p.rect(canvasProperties.plotEndPx[0], 0, canvasProperties.plotStartPx[0], canvasProperties.heightPx);
+        this.p.pop();
+    }
+
+    drawOutOfBoundsWarning(point: Point, canvasProperties: CanvasProperties) {
+        const x = this.p.constrain(point[0], canvasProperties.plotStartPx[0] + 20, canvasProperties.plotEndPx[0] - 20);
+        const y = this.p.constrain(point[1], canvasProperties.plotStartPx[1] + 20, canvasProperties.plotEndPx[1] - 20);
+        // Draw a red cross centered at (x, y) to indicate that a curve will be deleted if it is moved there
+        this.p.push();
+        this.p.stroke(255, 0, 0);
+        this.p.strokeWeight(2);
+        this.p.line(x - 10, y - 10, x + 10, y + 10);
+        this.p.line(x - 10, y + 10, x + 10, y - 10);
+        this.p.pop();
     }
 
     drawCorner(stretchMode: string, c: Curve) {
