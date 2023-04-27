@@ -483,23 +483,16 @@ export class GraphSketcher {
                     }
                 }
             }
-            let tc: Curve|null = null;
             for (let i = 0; i < this._state.curves.length; i++) {
                 for (let j = 0; j < this._state.curves[i].pts.length; j++) {
-                    if (GraphUtils.getDist(mousePosition, this._state.curves[i].pts[j]) < this.MOUSE_DETECT_RADIUS) {
+                    if (GraphUtils.getDist(mousePosition, this._state.curves[i].pts[j]) < this.MOUSE_DETECT_RADIUS * 2) {
                         this.clickedCurveIdx = i;
-                        tc = this._state.curves[this.clickedCurveIdx];
-                        break;
+                        this.movedCurveIdx = i;
+                        this.action = Action.MOVE_CURVE;
+                        this.clickedKnot = undefined;
+                        this.prevMousePt = mousePosition;
+                        return;
                     }
-                }
-            }
-            if (tc) {
-                if (mousePosition[0] >= tc.minX && mousePosition[0] <= tc.maxX && mousePosition[1] >= tc.minY && mousePosition[1] <= tc.maxY) {
-                    this.movedCurveIdx = this.clickedCurveIdx;
-                    this.action = Action.MOVE_CURVE;
-                    this.clickedKnot = undefined;
-                    this.prevMousePt = mousePosition;
-                    return;
                 }
             }
         }
