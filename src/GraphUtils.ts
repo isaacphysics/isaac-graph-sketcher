@@ -8,6 +8,8 @@ export function isDefined<T>(stuff: T): stuff is NonNullable<T> {
 
 const SAMPLE_INTERVAL = 10;
 const numOfPts = 100;
+export const CURVE_COMBINE_ENDPOINT_DISTANCE = 40;
+export const CURVE_COMBINE_ANGLE_THRESHOLD = Math.PI / 8;
 
 // methods used in manipulating the graphs
 export function getDist(pt1: Point, pt2: Point) {
@@ -680,6 +682,91 @@ export function stretchCurve(c: Curve, orx: number, ory: number, nrx: number, nr
         newInterY = findInterceptY(canvasProperties, pts);
     c.interY = loop2(interY, newInterY);
 };
+
+export function getCombinableEndPts(draggedCurve: Curve, staticCurve: Curve, draggedEndPtIdx: number, staticEndPtIdx: number) {
+    // Check if the curves are compatible - they must have the same colour
+    if (draggedCurve.colorIdx != staticCurve.colorIdx) {
+        return undefined;
+    }
+    // Check that the end points are close enough to each other
+    const draggedEndPt = draggedCurve.endPt?.[draggedEndPtIdx];
+    const staticEndPt = staticCurve.endPt?.[staticEndPtIdx];
+    if (draggedEndPt == undefined || staticEndPt == undefined || getDist(draggedEndPt, staticEndPt) > CURVE_COMBINE_ENDPOINT_DISTANCE) {
+        return undefined;
+    }
+    // Get the index of the end points inside each curves pts array
+    function getEndPointIdxInPts(curve: Curve, endPtIdx: number) {
+        if (curve.pts[0][0] === curve.endPt?.[endPtIdx][0] && curve.pts[0][1] === curve.endPt?.[endPtIdx][1]) {
+            return 0;
+        } else {
+            return curve.pts.length - 1;
+        }
+    }
+    const draggedEndPtIdxInPts = getEndPointIdxInPts(draggedCurve, draggedEndPtIdx);
+    const staticEndPtIdxInPts = getEndPointIdxInPts(staticCurve, staticEndPtIdx);
+    // Calculate the angle of the line between two points
+    function getAngle(point1: Point, point2: Point) {
+        // Order points by x value so we calculate the angle uniformly for differently oriented curves
+        //const [pt1, pt2] = point1[0] < point2[0] ? [point1, point2] : [point2, point1];
+        return Math.atan((point2[1] - point1[1]) / (point2[0] - point1[0]));
+    }
+    function getPreEndPt(curve: Curve, endPtIdx: number) {
+        return curve.pts[endPtIdx == 0 ? 1 : endPtIdx - 1];
+    }
+    // Pre-end points are the points just before/after the end points on each curve
+    const draggedPreEndPt = getPreEndPt(draggedCurve, draggedEndPtIdxInPts);
+    const staticPreEndPt = getPreEndPt(staticCurve, staticEndPtIdxInPts);
+    
+    const draggedEndPtAngle = getAngle(draggedEndPt, draggedPreEndPt);
+    const staticEndPtAngle = getAngle(staticEndPt, staticPreEndPt);
+    const angleBetweenEndPts = getAngle(draggedEndPt, staticEndPt);
+
+    // Make sure the average gradient of the two curves is close to the gradient between the end points. This should
+    // check directionality of pre-endpoint 1, endpoint 1, endpoint 2, pre-endpoint 2 points - they should go roughly
+    // in the same direction
+    if (Math.abs(draggedEndPtAngle - staticEndPtAngle) > CURVE_COMBINE_ANGLE_THRESHOLD || Math.abs(draggedEndPtAngle - angleBetweenEndPts) > CURVE_COMBINE_ANGLE_THRESHOLD || Math.abs(staticEndPtAngle - angleBetweenEndPts) > CURVE_COMBINE_ANGLE_THRESHOLD) {
+        return undefined;
+    }
+    return [draggedEndPtIdxInPts, staticEndPtIdxInPts];
+}
+
+// Combines two curves together. Doesn't modify the original curves, and returns a new curve.
+// The indices should be those of END points (either 0 or pts.length - 1), not points in the middle of the curve.
+export function combineCurves(draggedCurve: Curve, staticCurve: Curve, draggedEndPtIdxInPts: number, staticEndPtIdxInPts: number, canvasProperties: CanvasProperties) {
+    // Now extend the static curve by the points of the dragged curve
+    let combinedCurve = new Curve();
+    if (draggedEndPtIdxInPts == 0 && staticEndPtIdxInPts == staticCurve.pts.length - 1) {
+        // Start of dragged curve is being glued to the end of the static curve
+        combinedCurve.pts = staticCurve.pts.concat(draggedCurve.pts);
+    } else if (draggedEndPtIdxInPts == 0 && staticEndPtIdxInPts == 0) {
+        // Start of dragged curve is being glued to the start of the static curve
+        combinedCurve.pts = staticCurve.pts.slice().reverse().concat(draggedCurve.pts);
+    } else if (draggedEndPtIdxInPts == draggedCurve.pts.length - 1 && staticEndPtIdxInPts == staticCurve.pts.length - 1) {
+        // End of dragged curve is being glued to the end of the static curve
+        combinedCurve.pts = draggedCurve.pts.concat(staticCurve.pts.slice().reverse());
+    } else if (draggedEndPtIdxInPts == draggedCurve.pts.length - 1 && staticEndPtIdxInPts == 0) {
+        // End of dragged curve is being glued to the start of the static curve
+        combinedCurve.pts = draggedCurve.pts.concat(staticCurve.pts);
+    } else {
+        // This should never happen...
+        console.error("Error in combineCurves - end point indices are not 0 or pts.length - 1");
+        return undefined;
+    }
+    combinedCurve.pts = bezierLineStyle(combinedCurve.pts);
+    // Calculate the new properties of the combined curve - we need to do this because the bezierLineStyle function
+    // may have changed the curve a fair bit
+    combinedCurve.colorIdx = draggedCurve.colorIdx;
+    combinedCurve.minX = Math.min(...combinedCurve.pts.map(pt => pt[0]));
+    combinedCurve.maxX = Math.max(...combinedCurve.pts.map(pt => pt[0]));
+    combinedCurve.minY = Math.min(...combinedCurve.pts.map(pt => pt[1]));
+    combinedCurve.maxY = Math.max(...combinedCurve.pts.map(pt => pt[1]));
+    combinedCurve.interX = findInterceptX(canvasProperties, combinedCurve.pts);
+    combinedCurve.interY = findInterceptY(canvasProperties, combinedCurve.pts);
+    combinedCurve.endPt = findEndPts(combinedCurve.pts);
+    combinedCurve.maxima = findTurnPts(combinedCurve.pts, 'maxima');
+    combinedCurve.minima = findTurnPts(combinedCurve.pts, 'minima');
+    return combinedCurve;
+}
 
 export function _clone(obj: any) {
     if (isDefined(obj)) {
