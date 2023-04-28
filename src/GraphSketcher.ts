@@ -112,6 +112,7 @@ export class GraphSketcher {
     private elements: HTMLElement[] = [];
     private colorSelect?: HTMLSelectElement;
     private trashButton?: HTMLButtonElement;
+    private resetButton?: HTMLButtonElement;
 
     // The following public members can be modified from the outside
     public drawingColorName: string = "Blue";
@@ -155,6 +156,9 @@ export class GraphSketcher {
             this.trashButton = document.getElementById("graph-sketcher-ui-trash-button") as HTMLButtonElement;
             this.trashButton.addEventListener('click', this.deleteSelectedCurve);
             this.elements.push(this.trashButton);
+            this.resetButton = document.getElementById("graph-sketcher-ui-reset-button") as HTMLButtonElement;
+            this.resetButton.addEventListener('click', this.deleteAllCurves);
+            this.elements.push(this.resetButton);
 
             this.elements.push(document.getElementById("graph-sketcher-ui-submit-button") as HTMLElement);
             this.elements.push(document.getElementById("graph-sketcher-ui-help-button") as HTMLElement);
@@ -202,6 +206,15 @@ export class GraphSketcher {
     private deleteSelectedCurve = () => {
         if (isDefined(this.clickedCurveIdx) && isDefined(this._state.curves)) {
             this._state.curves.splice(this.clickedCurveIdx, 1);
+            this.clickedCurveIdx = undefined;
+            this.reDraw();
+        }
+    }
+
+    private deleteAllCurves = () => {
+        if (isDefined(this._state.curves)) {
+            this._state.curves = [];
+            this.movedCurveIdx = undefined;
             this.clickedCurveIdx = undefined;
             this.reDraw();
         }
@@ -887,6 +900,9 @@ export class GraphSketcher {
     private updateExternalUI = () => {
         if (isDefined(this.trashButton)) {
             this.trashButton.disabled = !isDefined(this.clickedCurveIdx);
+        }
+        if (isDefined(this.resetButton)) {
+            this.resetButton.disabled = this._state.curves === undefined || this._state.curves.length === 0;
         }
     }
 
