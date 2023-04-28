@@ -205,6 +205,12 @@ export class GraphSketcher {
 
     private deleteSelectedCurve = () => {
         if (isDefined(this.clickedCurveIdx) && isDefined(this._state.curves)) {
+            // Checkpoint
+            this.checkPoint = {};
+            this.checkPoint.curvesJSON = JSON.stringify(this._state);
+            this.checkPoint.clickedCurveIdx = this.clickedCurveIdx;
+            this.checkPointsUndo.push(this.checkPoint);
+            // Delete curve
             this._state.curves.splice(this.clickedCurveIdx, 1);
             this.clickedCurveIdx = undefined;
             this.reDraw();
@@ -213,6 +219,12 @@ export class GraphSketcher {
 
     private deleteAllCurves = () => {
         if (isDefined(this._state.curves)) {
+            // Checkpoint
+            this.checkPoint = {};
+            this.checkPoint.curvesJSON = JSON.stringify(this._state);
+            this.checkPoint.clickedCurveIdx = this.clickedCurveIdx;
+            this.checkPointsUndo.push(this.checkPoint);
+            // Delete curves
             this._state.curves = [];
             this.movedCurveIdx = undefined;
             this.clickedCurveIdx = undefined;
