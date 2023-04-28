@@ -8,6 +8,7 @@ export default class GraphView {
     public p: p5;
 
     private canvasProperties: CanvasProperties;
+    private backgroundGraphic: p5.Graphics;
 
     private DOT_LINE_COLOR = [123];
     private DEFAULT_KNOT_COLOR = [77,77,77];
@@ -24,6 +25,8 @@ export default class GraphView {
         this.p = p;
         this.PADDING = 0.025 * canvasProperties.axisLengthPx;
         this.canvasProperties = canvasProperties;
+        this.backgroundGraphic = this.p.createGraphics(canvasProperties.widthPx, canvasProperties.heightPx);
+        this.refreshBackground();
     }
 
     drawCurves(curves: Curve[], color = -1) {
@@ -189,13 +192,13 @@ export default class GraphView {
 
     drawArrowhead(at: Point, axis: Dimension) {
         if (axis == Dimension.Y) {
-            this.p.vertex(at[0] - 5, at[1] + 10);
-            this.p.vertex(at[0], at[1]);
-            this.p.vertex(at[0] + 5, at[1] + 10);
+            this.backgroundGraphic.vertex(at[0] - 5, at[1] + 10);
+            this.backgroundGraphic.vertex(at[0], at[1]);
+            this.backgroundGraphic.vertex(at[0] + 5, at[1] + 10);
         } else if (axis == Dimension.X) {
-            this.p.vertex(at[0] - 10, at[1] - 5);
-            this.p.vertex(at[0], at[1]);
-            this.p.vertex(at[0] - 10, at[1] + 5);
+            this.backgroundGraphic.vertex(at[0] - 10, at[1] - 5);
+            this.backgroundGraphic.vertex(at[0], at[1]);
+            this.backgroundGraphic.vertex(at[0] - 10, at[1] + 5);
         }
     }
 
@@ -203,93 +206,101 @@ export default class GraphView {
         let xAxisStart: Point = [this.canvasProperties.centerPx[0] - this.canvasProperties.axisLengthPx/2 + this.PADDING, this.canvasProperties.centerPx[1]]
         let xAxisEnd: Point = [this.canvasProperties.centerPx[0] + this.canvasProperties.axisLengthPx/2 - this.PADDING, this.canvasProperties.centerPx[1]]
 
-        this.p.push();
+        this.backgroundGraphic.push();
 
-        this.p.strokeWeight(curveStrokeWeight);
-        this.p.strokeJoin(this.p.ROUND);
-        this.p.stroke(0);
-        this.p.noFill();
+        this.backgroundGraphic.strokeWeight(curveStrokeWeight);
+        this.backgroundGraphic.strokeJoin(this.p.ROUND);
+        this.backgroundGraphic.stroke(0);
+        this.backgroundGraphic.noFill();
 
-        this.p.beginShape();
-        this.p.vertex(xAxisStart[0], xAxisStart[1]);
-        this.p.vertex(xAxisEnd[0], xAxisEnd[1]);
+        this.backgroundGraphic.beginShape();
+        this.backgroundGraphic.vertex(xAxisStart[0], xAxisStart[1]);
+        this.backgroundGraphic.vertex(xAxisEnd[0], xAxisEnd[1]);
         this.drawArrowhead(xAxisEnd, Dimension.X);
-        this.p.endShape();
+        this.backgroundGraphic.endShape();
 
-        this.p.pop();
+        this.backgroundGraphic.pop();
     }
 
     drawVerticalAxis(curveStrokeWeight: number) {
         let yAxisStart: Point = [this.canvasProperties.centerPx[0], this.canvasProperties.centerPx[1] - this.canvasProperties.axisLengthPx / 2 + this.PADDING]
         let yAxisEnd: Point = [this.canvasProperties.centerPx[0], this.canvasProperties.centerPx[1] + this.canvasProperties.axisLengthPx / 2 - this.PADDING]
 
-        this.p.push();
+        this.backgroundGraphic.push();
 
-        this.p.strokeWeight(curveStrokeWeight);
-        this.p.strokeJoin(this.p.ROUND);
-        this.p.stroke(0);
-        this.p.noFill();
+        this.backgroundGraphic.strokeWeight(curveStrokeWeight);
+        this.backgroundGraphic.strokeJoin(this.backgroundGraphic.ROUND);
+        this.backgroundGraphic.stroke(0);
+        this.backgroundGraphic.noFill();
 
-        this.p.beginShape();
+        this.backgroundGraphic.beginShape();
         this.drawArrowhead(yAxisStart, Dimension.Y);
-        this.p.vertex(yAxisStart[0], yAxisStart[1]);
-        this.p.vertex(yAxisEnd[0], yAxisEnd[1]);
-        this.p.endShape();
+        this.backgroundGraphic.vertex(yAxisStart[0], yAxisStart[1]);
+        this.backgroundGraphic.vertex(yAxisEnd[0], yAxisEnd[1]);
+        this.backgroundGraphic.endShape();
 
-        this.p.pop();
+        this.backgroundGraphic.pop();
     }
 
     drawGrid(curveStrokeWeight: number) {
-        this.p.push();
+        this.backgroundGraphic.push();
 
-        this.p.noFill();
-        this.p.strokeWeight(curveStrokeWeight);
-        this.p.strokeJoin(this.p.ROUND);
-        this.p.stroke(240);
+        this.backgroundGraphic.noFill();
+        this.backgroundGraphic.strokeWeight(curveStrokeWeight);
+        this.backgroundGraphic.strokeJoin(this.p.ROUND);
+        this.backgroundGraphic.stroke(240);
 
-        this.p.push();
+        this.backgroundGraphic.push();
 
         // draw grid lines
         // use top-left of drawable area as origin
-        this.p.translate(this.canvasProperties.plotStartPx[0], this.canvasProperties.plotStartPx[1]);
+        this.backgroundGraphic.translate(this.canvasProperties.plotStartPx[0], this.canvasProperties.plotStartPx[1]);
 
         let cellSize = this.canvasProperties.axisLengthPx / this.CELLS;
         for (let cellNo = 1; cellNo < this.CELLS; cellNo++) {
             // horizontal
-            this.p.line(0, cellSize * cellNo, this.canvasProperties.axisLengthPx, cellSize * cellNo)
+            this.backgroundGraphic.line(0, cellSize * cellNo, this.canvasProperties.axisLengthPx, cellSize * cellNo)
             // vertical
-            this.p.line(cellSize * cellNo, 0, cellSize * cellNo, this.canvasProperties.axisLengthPx)
+            this.backgroundGraphic.line(cellSize * cellNo, 0, cellSize * cellNo, this.canvasProperties.axisLengthPx)
         }
 
-        this.p.pop();
-        this.p.pop();
+        this.backgroundGraphic.pop();
+        this.backgroundGraphic.pop();
     }
 
     drawLabel() {
-        this.p.push();
+        this.backgroundGraphic.push();
 
-        this.p.textSize(16);
-        this.p.stroke(0);
-        this.p.strokeWeight(0.5);
-        this.p.fill(0);
+        this.backgroundGraphic.textSize(16);
+        this.backgroundGraphic.stroke(0);
+        this.backgroundGraphic.strokeWeight(0.5);
+        this.backgroundGraphic.fill(0);
 
-        this.p.text("O", this.canvasProperties.centerPx[0] - 15, this.canvasProperties.centerPx[1] + 15);
-        this.p.text("x", this.canvasProperties.centerPx[0] + this.canvasProperties.axisLengthPx/2 - this.PADDING, this.canvasProperties.centerPx[1] + 15);
-        this.p.text("y", this.canvasProperties.centerPx[0] + 5, this.canvasProperties.centerPx[1] - this.canvasProperties.axisLengthPx / 2 + this.PADDING);
+        this.backgroundGraphic.text("O", this.canvasProperties.centerPx[0] - 15, this.canvasProperties.centerPx[1] + 15);
+        this.backgroundGraphic.text("x", this.canvasProperties.centerPx[0] + this.canvasProperties.axisLengthPx/2 - this.PADDING, this.canvasProperties.centerPx[1] + 15);
+        this.backgroundGraphic.text("y", this.canvasProperties.centerPx[0] + 5, this.canvasProperties.centerPx[1] - this.canvasProperties.axisLengthPx / 2 + this.PADDING);
 
-        this.p.pop();
+        this.backgroundGraphic.pop();
     }
 
-    drawBackground(canvasProperties: CanvasProperties) {
-        this.canvasProperties = canvasProperties;
-
-        this.p.clear(0, 0, 0, 0);
-        this.p.background(255);
+    refreshBackground() {
+        this.backgroundGraphic.clear(0, 0, 0, 0);
+        this.backgroundGraphic.background(255);
 
         this.drawGrid(this.CURVE_STRKWEIGHT);
         this.drawHorizontalAxis(this.CURVE_STRKWEIGHT);
         this.drawVerticalAxis(this.CURVE_STRKWEIGHT);
         this.drawLabel();
+    }
+
+    drawBackground(canvasProperties: CanvasProperties) {
+        this.canvasProperties = canvasProperties;
+        // Check if the background needs to be redrawn
+        if (this.backgroundGraphic.width != this.canvasProperties.widthPx || this.backgroundGraphic.height != this.canvasProperties.heightPx) {
+            this.backgroundGraphic = this.p.createGraphics(this.canvasProperties.widthPx, this.canvasProperties.heightPx);
+            this.refreshBackground();
+        }
+        this.p.image(this.backgroundGraphic, 0, 0);
     }
 
     drawBoundaries(canvasProperties: CanvasProperties) {
