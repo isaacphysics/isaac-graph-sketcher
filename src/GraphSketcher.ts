@@ -684,8 +684,27 @@ export class GraphSketcher {
         } else if (this.action === Action.DRAW_CURVE && this.drawnColorIdx >= 0) {
             this.p.cursor(this.p.CROSS);
             if (isDefined(this._state.curves) && this._state.curves.length < this.CURVE_LIMIT) {
-                const constrainedMouseX = this.p.constrain(mousePosition[0], this.canvasProperties.plotStartPx[0], this.canvasProperties.plotEndPx[0]);
+
+                // Constrain mouse x position based on x-direction of line between last two points
+                let constrainedMouseX: number;
+                if (this.drawnPts.length > 1) {
+                    if (this.drawnPts[this.drawnPts.length - 1][0] - this.drawnPts[this.drawnPts.length - 2][0] < 0) {
+                        constrainedMouseX = this.p.constrain(mousePosition[0], this.canvasProperties.plotStartPx[0], this.drawnPts[this.drawnPts.length - 1][0] - 0.1);
+                    } else {
+                        constrainedMouseX = this.p.constrain(mousePosition[0], this.drawnPts[this.drawnPts.length - 1][0] + 0.1, this.canvasProperties.plotEndPx[0]);
+                    }
+                } else {
+                    // Check that there a decent amount of x-movement in the second point so we can be sure of the direction
+                    // that the user is trying to draw the curve in
+                    // TODO find the right threshold, might need a fair bit of testing
+                    if (this.drawnPts.length > 0 && Math.abs(this.drawnPts[0][0] - mousePosition[0]) < 8 / (Math.max(1, Math.abs(this.drawnPts[0][1] - mousePosition[1])) ** 2)) {
+                        return;
+                    }
+                    constrainedMouseX = this.p.constrain(mousePosition[0], this.canvasProperties.plotStartPx[0], this.canvasProperties.plotEndPx[0]);
+                }
+                // By induction, the x-position of the last three points is (strictly) increasing or decreasing
                 const constrainedMouseY = this.p.constrain(mousePosition[1], this.canvasProperties.plotStartPx[1], this.canvasProperties.plotEndPx[1]);
+
                 this.p.push();
                 this.p.stroke(this.graphView.CURVE_COLORS[this.drawnColorIdx]);
                 this.p.strokeWeight(this.graphView.CURVE_STRKWEIGHT);
