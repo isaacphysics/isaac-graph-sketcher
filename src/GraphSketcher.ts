@@ -111,8 +111,8 @@ export class GraphSketcher {
     public canvas?: p5.Renderer;
     private elements: HTMLElement[] = [];
     private colorSelect?: HTMLSelectElement;
-    private trashButton?: HTMLElement;
-    public isTrashActive? = false;
+    private trashButton?: HTMLButtonElement;
+    private resetButton?: HTMLButtonElement;
 
     // The following public members can be modified from the outside
     public drawingColorName: string = "Blue";
@@ -153,9 +153,12 @@ export class GraphSketcher {
             this.elements.push(document.getElementById("graph-sketcher-ui-bezier-button") as HTMLElement);
             this.elements.push(document.getElementById("graph-sketcher-ui-linear-button") as HTMLElement);
 
-            this.trashButton = document.getElementById("graph-sketcher-ui-trash-button") as HTMLElement;
+            this.trashButton = document.getElementById("graph-sketcher-ui-trash-button") as HTMLButtonElement;
             this.trashButton.addEventListener('click', this.deleteSelectedCurve);
             this.elements.push(this.trashButton);
+            this.resetButton = document.getElementById("graph-sketcher-ui-reset-button") as HTMLButtonElement;
+            this.resetButton.addEventListener('click', this.deleteAllCurves);
+            this.elements.push(this.resetButton);
 
             this.elements.push(document.getElementById("graph-sketcher-ui-submit-button") as HTMLElement);
             this.elements.push(document.getElementById("graph-sketcher-ui-help-button") as HTMLElement);
@@ -202,20 +205,41 @@ export class GraphSketcher {
 
     private deleteSelectedCurve = () => {
         if (isDefined(this.clickedCurveIdx) && isDefined(this._state.curves)) {
+            // Checkpoint
+            this.checkPoint = {};
+            this.checkPoint.curvesJSON = JSON.stringify(this._state);
+            this.checkPoint.clickedCurveIdx = this.clickedCurveIdx;
+            this.checkPointsUndo.push(this.checkPoint);
+            // Delete curve
             this._state.curves.splice(this.clickedCurveIdx, 1);
             this.clickedCurveIdx = undefined;
+            this.reDraw();
+        }
+    }
+
+    private deleteAllCurves = () => {
+        if (isDefined(this._state.curves)) {
+            // Checkpoint
+            this.checkPoint = {};
+            this.checkPoint.curvesJSON = JSON.stringify(this._state);
+            this.checkPoint.clickedCurveIdx = this.clickedCurveIdx;
+            this.checkPointsUndo.push(this.checkPoint);
+            // Delete curves
+            this._state.curves = [];
+            this.movedCurveIdx = undefined;
+            this.clickedCurveIdx = undefined;
+            this.reDraw();
         }
     }
 
     private isPointOverButton = (pt: Point, button: HTMLElement) => {
         const rect = button.getBoundingClientRect();
-
         if (rect) {
             let left = rect.left;
             let top = rect.top;
             let width = rect.width;
             let height = rect.height;
-            return (pt[0] > left && pt[0] < left + width && pt[1] > top && pt[1] < top + height);
+            return pt[0] > left && pt[0] < left + width && pt[1] > top && pt[1] < top + height;
         }
         return false;
     }
@@ -566,8 +590,6 @@ export class GraphSketcher {
         } else if (this.action === Action.MOVE_CURVE && isDefined(this.movedCurveIdx) && isDefined(this._state.curves)) {
             this.p.cursor(this.p.MOVE);
 
-            this.isTrashActive = this.isPointOverButton(mousePosition, this.trashButton as HTMLElement);
-
             let dx = mousePosition[0] - this.prevMousePt[0];
             let dy = mousePosition[1] - this.prevMousePt[1];
             this.prevMousePt = mousePosition;
@@ -774,12 +796,10 @@ export class GraphSketcher {
             this.checkPointsRedo = [];
 
             // Delete the curve if it is in the trash, or if it is mostly off screen
-            if (isDefined(this.movedCurveIdx) && isDefined(this._state.curves) && (this.isTrashActive || isDefined(this.outOfBoundsCurvePoint))) {
+            if (isDefined(this.movedCurveIdx) && isDefined(this._state.curves) && isDefined(this.outOfBoundsCurvePoint)) {
                 this._state.curves.splice(this.movedCurveIdx, 1);
                 this.clickedCurveIdx = undefined;
             }
-
-            this.isTrashActive = false;
             this.outOfBoundsCurvePoint = undefined;
             this.reDraw();
 
@@ -908,8 +928,18 @@ export class GraphSketcher {
         }
     }
 
+    private updateExternalUI = () => {
+        if (isDefined(this.trashButton)) {
+            this.trashButton.disabled = !isDefined(this.clickedCurveIdx);
+        }
+        if (isDefined(this.resetButton)) {
+            this.resetButton.disabled = this._state.curves === undefined || this._state.curves.length === 0;
+        }
+    }
+
     // equivalent to 'locally' refreshing the canvas
     public reDraw = () => {
+        this.updateExternalUI();
         // FIXME Save the background grid and axes in a graphics object inside GraphView so they don't
         //  have to be redrawn every time - would need to be redrawn if the canvas size changes
         this.graphView.drawBackground(this.canvasProperties);
