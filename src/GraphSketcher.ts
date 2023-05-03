@@ -53,6 +53,7 @@ export class GraphSketcher {
     private graphView: GraphView;
 
     private previewMode: boolean = false;
+    private allowMultiValuedFunctions: boolean = false;
     private showDebugInfo: boolean = false;
 
     private checkPoint: any;
@@ -123,7 +124,7 @@ export class GraphSketcher {
 
     public setupDone = false;
 
-    constructor(p: p5, width: number, height: number, options: { previewMode: boolean, initialCurves?: Curve[]}) {
+    constructor(p: p5, width: number, height: number, options: { previewMode: boolean, initialCurves?: Curve[], allowMultiValuedFunctions?: boolean}) {
         this.p = p;
 
         // todo: we could use the state pattern for these methods, as behaviour largely depends on the current Action
@@ -143,6 +144,7 @@ export class GraphSketcher {
         this.canvasProperties = GraphSketcher.getCanvasPropertiesForResolution(width, height);
         this.graphView = new GraphView(p, this.canvasProperties);
         this.previewMode = options.previewMode;
+        this.allowMultiValuedFunctions = options.allowMultiValuedFunctions ?? false;
         this._state = GraphUtils.decodeData({ curves: options.initialCurves ?? [], canvasWidth: width, canvasHeight: height }, this.canvasProperties);
         this._oldState = _cloneDeep(this._state);
     }
@@ -714,22 +716,26 @@ export class GraphSketcher {
                 // the only thing that enforces this, so will be easy to remove if it's not wanted (see `git blame`
                 // for the relevant commit)
                 let constrainedMouseX: number;
-                if (this.drawnPts.length > 1) {
-                    if (this.drawnPts[this.drawnPts.length - 1][0] - this.drawnPts[this.drawnPts.length - 2][0] < 0) {
-                        constrainedMouseX = this.p.constrain(mousePosition[0], this.canvasProperties.plotStartPx[0], this.drawnPts[this.drawnPts.length - 1][0] - 0.1);
+                if (!this.allowMultiValuedFunctions) {
+                    if (this.drawnPts.length > 1) {
+                        if (this.drawnPts[this.drawnPts.length - 1][0] - this.drawnPts[this.drawnPts.length - 2][0] < 0) {
+                            constrainedMouseX = this.p.constrain(mousePosition[0], this.canvasProperties.plotStartPx[0], this.drawnPts[this.drawnPts.length - 1][0] - 0.1);
+                        } else {
+                            constrainedMouseX = this.p.constrain(mousePosition[0], this.drawnPts[this.drawnPts.length - 1][0] + 0.1, this.canvasProperties.plotEndPx[0]);
+                        }
                     } else {
-                        constrainedMouseX = this.p.constrain(mousePosition[0], this.drawnPts[this.drawnPts.length - 1][0] + 0.1, this.canvasProperties.plotEndPx[0]);
+                        // Check that there a decent amount of x-movement in the second point so we can be sure of the direction
+                        // that the user is trying to draw the curve in
+                        // TODO find the right threshold, might need a fair bit of testing
+                        if (this.drawnPts.length > 0 && Math.abs(this.drawnPts[0][0] - mousePosition[0]) < 2 / (Math.max(1, Math.abs(this.drawnPts[0][1] - mousePosition[1])) ** 2)) {
+                            return;
+                        }
+                        constrainedMouseX = this.p.constrain(mousePosition[0], this.canvasProperties.plotStartPx[0], this.canvasProperties.plotEndPx[0]);
                     }
+                    // By induction, the x-position of the last three points is (strictly) increasing or decreasing (ignoring some weird edge cases)
                 } else {
-                    // Check that there a decent amount of x-movement in the second point so we can be sure of the direction
-                    // that the user is trying to draw the curve in
-                    // TODO find the right threshold, might need a fair bit of testing
-                    if (this.drawnPts.length > 0 && Math.abs(this.drawnPts[0][0] - mousePosition[0]) < 2 / (Math.max(1, Math.abs(this.drawnPts[0][1] - mousePosition[1])) ** 2)) {
-                        return;
-                    }
                     constrainedMouseX = this.p.constrain(mousePosition[0], this.canvasProperties.plotStartPx[0], this.canvasProperties.plotEndPx[0]);
                 }
-                // By induction, the x-position of the last three points is (strictly) increasing or decreasing (ignoring some weird edge cases)
                 const constrainedMouseY = this.p.constrain(mousePosition[1], this.canvasProperties.plotStartPx[1], this.canvasProperties.plotEndPx[1]);
 
                 this.p.push();
@@ -972,7 +978,7 @@ export class GraphSketcher {
     };
 }
 
-export function makeGraphSketcher(element: HTMLElement | undefined | null, width: number, height: number, options: { previewMode: boolean, initialCurves?: Curve[] } = { previewMode: false }): { sketch?: GraphSketcher, p: p5 } {
+export function makeGraphSketcher(element: HTMLElement | undefined | null, width: number, height: number, options: { previewMode: boolean, initialCurves?: Curve[], allowMultiValuedFunctions?: boolean } = { previewMode: false, allowMultiValuedFunctions: false }): { sketch?: GraphSketcher, p: p5 } {
     let sketch: GraphSketcher | undefined;
     let p = new p5(instance => {
         sketch = new GraphSketcher(instance, width, height, options);
