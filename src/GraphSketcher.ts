@@ -90,10 +90,12 @@ export class GraphSketcher {
     get state(): GraphSketcherState {
         return this._state;
     }
+    // This is only used externally at the moment - if it gets used internally then prepare for infinite loops
+    // (basically, if you want to change the curves, then please update this._state instead of this.state)
     set state(newState: GraphSketcherState) {
         if (isDefined(newState) && isDefined(newState.curves)) {
-            const state = GraphUtils.decodeData(newState, this.canvasProperties);
-            this._state = state;
+            this._state = GraphUtils.decodeData(newState, this.canvasProperties);
+            this._oldState = _cloneDeep(this._state);
         } else if (isDefined(newState)) {
             this._state.curves = [];
         }
@@ -141,7 +143,7 @@ export class GraphSketcher {
         this.canvasProperties = GraphSketcher.getCanvasPropertiesForResolution(width, height);
         this.graphView = new GraphView(p, this.canvasProperties);
         this.previewMode = options.previewMode;
-        this._state = { curves: options.initialCurves, canvasWidth: width, canvasHeight: height };
+        this._state = GraphUtils.decodeData({ curves: options.initialCurves ?? [], canvasWidth: width, canvasHeight: height }, this.canvasProperties);
         this._oldState = _cloneDeep(this._state);
     }
 
@@ -204,6 +206,7 @@ export class GraphSketcher {
         if (isDefined(this.clickedCurveIdx) && isDefined(this._state.curves)) {
             this._state.curves.splice(this.clickedCurveIdx, 1);
             this.clickedCurveIdx = undefined;
+            this.reDraw();
         }
     }
 
@@ -298,6 +301,7 @@ export class GraphSketcher {
 
         this.clickedKnot = undefined;
         this.clickedCurveIdx = undefined;
+
         this.reDraw();
     }
 
@@ -336,7 +340,7 @@ export class GraphSketcher {
                 return;
             } else if (found === "notFound") {
                 this.p.cursor(this.p.CROSS);
-                this.reDraw();
+                //this.reDraw();  // FIXME why was this here in the first place
             }
         }
 
@@ -358,7 +362,7 @@ export class GraphSketcher {
                     this.p.rect(c.maxX - 4, c.maxY - 4, 8, 8);
                 }
 
-                this.p.pop;
+                this.p.pop();
 
                 this.p.cursor(this.p.MOVE);
             } else if (detect((c.minX + c.maxX) / 2, c.minY - 3) || detect((c.minX + c.maxX) / 2, c.maxY + 3) ||
@@ -684,8 +688,29 @@ export class GraphSketcher {
         } else if (this.action === Action.DRAW_CURVE && this.drawnColorIdx >= 0) {
             this.p.cursor(this.p.CROSS);
             if (isDefined(this._state.curves) && this._state.curves.length < this.CURVE_LIMIT) {
-                const constrainedMouseX = this.p.constrain(mousePosition[0], this.canvasProperties.plotStartPx[0], this.canvasProperties.plotEndPx[0]);
+
+                // Constrain mouse x position based on x-direction of line between last two points - this block is
+                // the only thing that enforces this, so will be easy to remove if it's not wanted (see `git blame`
+                // for the relevant commit)
+                let constrainedMouseX: number;
+                if (this.drawnPts.length > 1) {
+                    if (this.drawnPts[this.drawnPts.length - 1][0] - this.drawnPts[this.drawnPts.length - 2][0] < 0) {
+                        constrainedMouseX = this.p.constrain(mousePosition[0], this.canvasProperties.plotStartPx[0], this.drawnPts[this.drawnPts.length - 1][0] - 0.1);
+                    } else {
+                        constrainedMouseX = this.p.constrain(mousePosition[0], this.drawnPts[this.drawnPts.length - 1][0] + 0.1, this.canvasProperties.plotEndPx[0]);
+                    }
+                } else {
+                    // Check that there a decent amount of x-movement in the second point so we can be sure of the direction
+                    // that the user is trying to draw the curve in
+                    // TODO find the right threshold, might need a fair bit of testing
+                    if (this.drawnPts.length > 0 && Math.abs(this.drawnPts[0][0] - mousePosition[0]) < 2 / (Math.max(1, Math.abs(this.drawnPts[0][1] - mousePosition[1])) ** 2)) {
+                        return;
+                    }
+                    constrainedMouseX = this.p.constrain(mousePosition[0], this.canvasProperties.plotStartPx[0], this.canvasProperties.plotEndPx[0]);
+                }
+                // By induction, the x-position of the last three points is (strictly) increasing or decreasing (ignoring some weird edge cases)
                 const constrainedMouseY = this.p.constrain(mousePosition[1], this.canvasProperties.plotStartPx[1], this.canvasProperties.plotEndPx[1]);
+
                 this.p.push();
                 this.p.stroke(this.graphView.CURVE_COLORS[this.drawnColorIdx]);
                 this.p.strokeWeight(this.graphView.CURVE_STRKWEIGHT);
@@ -894,27 +919,16 @@ export class GraphSketcher {
         // FIXME Save the background grid and axes in a graphics object inside GraphView so they don't
         //  have to be redrawn every time - would need to be redrawn if the canvas size changes
         this.graphView.drawBackground(this.canvasProperties);
-        if (isDefined(this._state.curves) && this._state.curves.length < 4 && this.updateGraphSketcherState) {
-            if (this._state.curves.length > 0) {
-                const curve = this._state.curves[0];
-                if (curve.maxX < 2.0 && curve.minX > -2.0 && curve.minY < 2.0 && curve.maxY > -2.0) {
-                    // This takes in the state from the react component
-                    const newState = GraphUtils.decodeData(this._state, this.canvasProperties);
-                    this._oldState = _cloneDeep(newState);
-                    this._state = _cloneDeep(newState);
-                } else {
-                    // This sends out the state to the react component
-                    // We only do this if the state has actually changed.
-                    if (!_isEqual(this._oldState.curves, this._state.curves)) {
-                        const newState = GraphUtils.encodeData(true, this.canvasProperties, this._state.curves);
-                        if (newState) {
-                            this._oldState = _cloneDeep(this._state);
-                            this.updateGraphSketcherState(newState);
-                        }
-                    }
-                }
+
+        // THIS INFORMS THE LISTENER OF A STATE CHANGE (if the state has changed)
+        if (isDefined(this._state.curves) && this.updateGraphSketcherState && !_isEqual(this._oldState.curves, this._state.curves)) {
+            const newState = GraphUtils.encodeData(true, this.canvasProperties, this._state.curves);
+            if (newState) {
+                this._oldState = _cloneDeep(this._state);
+                this.updateGraphSketcherState(newState);
             }
         }
+
         if (isDefined(this.clickedCurveIdx) && isDefined(this._state.curves)) {
             this.graphView.drawStretchBox(this.clickedCurveIdx, this._state.curves);
         }
@@ -929,12 +943,12 @@ export class GraphSketcher {
     };
 }
 
-export function makeGraphSketcher(element: HTMLElement | undefined, width: number, height: number, options: { previewMode: boolean, initialCurves?: Curve[] } = { previewMode: false }): { sketch?: GraphSketcher, p: p5 } {
+export function makeGraphSketcher(element: HTMLElement | undefined | null, width: number, height: number, options: { previewMode: boolean, initialCurves?: Curve[] } = { previewMode: false }): { sketch?: GraphSketcher, p: p5 } {
     let sketch: GraphSketcher | undefined;
     let p = new p5(instance => {
         sketch = new GraphSketcher(instance, width, height, options);
         return sketch;
-    }, element);
+    }, element ?? undefined);
     return { sketch, p };
 }
 
