@@ -933,6 +933,8 @@ export class GraphSketcher {
         }
     }
 
+    // Kind of hacky, and tightly coupled to isaac-react-app, but it seems to be the only way to get the external UI
+    // to update nicely with canvas events, without having to pass in a bunch of callbacks or polling
     private updateExternalUI = () => {
         if (isDefined(this.trashButton)) {
             this.trashButton.disabled = !isDefined(this.clickedCurveIdx);
@@ -945,8 +947,6 @@ export class GraphSketcher {
     // equivalent to 'locally' refreshing the canvas
     public reDraw = () => {
         this.updateExternalUI();
-        // FIXME Save the background grid and axes in a graphics object inside GraphView so they don't
-        //  have to be redrawn every time - would need to be redrawn if the canvas size changes
         this.graphView.drawBackground(this.canvasProperties);
 
         // THIS INFORMS THE LISTENER OF A STATE CHANGE (if the state has changed)
