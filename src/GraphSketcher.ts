@@ -718,7 +718,10 @@ export class GraphSketcher {
                 let constrainedMouseX: number;
                 if (!this.allowMultiValuedFunctions) {
                     if (this.drawnPts.length > 1) {
-                        if (this.drawnPts[this.drawnPts.length - 1][0] - this.drawnPts[this.drawnPts.length - 2][0] < 0) {
+                        const lastPointOffGrid = this.drawnPts[this.drawnPts.length - 1][0] < this.canvasProperties.plotStartPx[0] || this.drawnPts[this.drawnPts.length - 1][0] > this.canvasProperties.plotEndPx[0];
+                        if (lastPointOffGrid || this.drawnPts[this.drawnPts.length - 1][0] === this.drawnPts[this.drawnPts.length - 2][0]) {
+                            return;
+                        } else if (this.drawnPts[this.drawnPts.length - 1][0] < this.drawnPts[this.drawnPts.length - 2][0]) {
                             constrainedMouseX = this.p.constrain(mousePosition[0], this.canvasProperties.plotStartPx[0], this.drawnPts[this.drawnPts.length - 1][0] - 0.1);
                         } else {
                             constrainedMouseX = this.p.constrain(mousePosition[0], this.drawnPts[this.drawnPts.length - 1][0] + 0.1, this.canvasProperties.plotEndPx[0]);
