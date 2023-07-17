@@ -510,7 +510,7 @@ export function translateCurve(curve: Curve, dx: number, dy: number, canvasPrope
     return;
 };
 
-export function stretchTurningPoint(importantPoints: Point[], e: MouseEvent, selectedCurve: Curve, isMaxima: boolean, selectedPointIndex: number|undefined, prevMousePt: Point, canvasProperties: CanvasProperties) {
+export function stretchTurningPoint(importantPoints: Point[], e: MouseEvent | TouchEvent | Touch, selectedCurve: Curve, isMaxima: boolean, selectedPointIndex: number|undefined, prevMousePt: Point, canvasProperties: CanvasProperties) {
     if (!isDefined(selectedPointIndex)) return;
 
     let mousePosition = getMousePt(e);

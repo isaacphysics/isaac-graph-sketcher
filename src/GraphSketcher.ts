@@ -192,6 +192,7 @@ export class GraphSketcher {
         this.p.setup = () => {};
 
         this.trashButton?.removeEventListener('click', this.deleteSelectedCurve);
+        this.resetButton?.removeEventListener('click', this.deleteAllCurves);
     }
 
     private static getCanvasPropertiesForResolution(width: number, height: number): CanvasProperties {
@@ -412,10 +413,12 @@ export class GraphSketcher {
     }
 
     // Determines type of action when clicking on something within the canvas
-    private mousePressed = (e: MouseEvent) => {
+    private mousePressed = (e: MouseEvent | TouchEvent | Touch) => {
         if (this.previewMode) return;
 
-        e.preventDefault(); // Stops highlighting text on click and drag
+        if (e instanceof MouseEvent) {
+            e.preventDefault(); // Stops highlighting text on click and drag
+        }
 
         this.isMouseDragged = false;
         this.action = Action.NO_ACTION;
@@ -557,10 +560,12 @@ export class GraphSketcher {
     }
 
     // Keep actions for curve manipulation together
-    private mouseDragged = (e: MouseEvent) => {
+    private mouseDragged = (e: MouseEvent | TouchEvent | Touch) => {
         if (this.previewMode) return;
 
-        e.preventDefault(); // Stops highlighting text on click and drag
+        if (e instanceof MouseEvent) {
+            e.preventDefault(); // Stops highlighting text on click and drag
+        }
 
         this.isMouseDragged = true;
         let mousePosition = GraphUtils.getMousePt(e);
@@ -755,10 +760,12 @@ export class GraphSketcher {
     }
 
     // Need to know where to update points to - gives final position
-    private mouseReleased = (_e: MouseEvent) => {
+    private mouseReleased = (_e: MouseEvent | TouchEvent | Touch) => {
         if (this.previewMode) return;
 
-        _e.preventDefault(); // Stops highlighting text on click and drag
+        if (_e instanceof MouseEvent) {
+            _e.preventDefault(); // Stops highlighting text on click and drag
+        }
 
         let mousePosition = this.releasePt;
 
@@ -902,19 +909,19 @@ export class GraphSketcher {
     // Would like to be used on touch screen devices, this simply facilitates it
     private touchStarted = (e: TouchEvent) => {
         if (this.previewMode) return;
-
+        //e.preventDefault(); // Ideally we want this, but it breaks interaction with the rest of the sketcher UI for some reason... commented out for now
         this.p.mousePressed(e.touches[0]);
     }
 
     private touchMoved = (e: TouchEvent) => {
         if (this.previewMode) return;
-
+        //e.preventDefault();
         this.p.mouseDragged(e.touches[0]);
     }
 
     private touchEnded = (e: TouchEvent) => {
         if (this.previewMode) return;
-
+        //e.preventDefault();
         this.p.mouseReleased(e);
     }
 
@@ -922,7 +929,7 @@ export class GraphSketcher {
         const data = GraphUtils.encodeData(false, this.canvasProperties, this._state.curves || []);
         if (!this.previewMode) {
             this.canvasProperties = GraphSketcher.getCanvasPropertiesForResolution(window.innerWidth, window.innerHeight)
-            this.p.resizeCanvas(window.innerWidth, window.innerHeight);
+            this.p.resizeCanvas(window.innerWidth, window.innerHeight, true);
         }
         if (isDefined(data)) {
             this._state = GraphUtils.decodeData(data, this.canvasProperties);
