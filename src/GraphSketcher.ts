@@ -755,12 +755,24 @@ export class GraphSketcher {
                 this.p.push();
                 this.p.stroke(this.graphView.CURVE_COLORS[this.drawnColorIdx]);
                 this.p.strokeWeight(this.graphView.CURVE_STRKWEIGHT);
-                if (this.drawnPts.length > 0) {
-                    let precedingPoint = this.drawnPts[this.drawnPts.length - 1];
-                    this.p.line(precedingPoint[0], precedingPoint[1], constrainedMouseX, constrainedMouseY);
+                if (this.selectedLineType === LineType.LINEAR) {
+                    this.reDraw();
+                    if (this.drawnPts.length > 1) {
+                        const initialPoint = this.drawnPts[0];
+                        this.p.line(initialPoint[0], initialPoint[1], constrainedMouseX, constrainedMouseY);                        
+                        this.drawnPts.pop();
+                    }
+                    this.p.pop();
+                    this.drawnPts.push([constrainedMouseX, constrainedMouseY]);
+                } else {
+                    if (this.drawnPts.length > 0) {
+                        const precedingPoint = this.drawnPts[this.drawnPts.length - 1];
+                        this.p.line(precedingPoint[0], precedingPoint[1], constrainedMouseX, constrainedMouseY);
+                    }
+                    this.p.pop();
+                    this.drawnPts.push([constrainedMouseX, constrainedMouseY]);
                 }
-                this.p.pop();
-                this.drawnPts.push([constrainedMouseX, constrainedMouseY]);
+
             }
         }
     }
@@ -844,7 +856,7 @@ export class GraphSketcher {
 
             if (isDefined(this._state.curves) && this._state.curves.length < this.CURVE_LIMIT){
 
-                if (this.drawnPts.length < 3) {
+                if (this.drawnPts.length < 3 && this.selectedLineType !== LineType.LINEAR) {
                     // If the curve is too short or mostly outside the plot, don't add it
                     return;
                 }
