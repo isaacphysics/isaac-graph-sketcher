@@ -61,7 +61,7 @@ export class GraphSketcher {
     public  checkPointsRedo: any[] = [];
 
     private CURVE_LIMIT = 3;
-    private MOUSE_DETECT_RADIUS = 10;
+    private MOUSE_DETECT_RADIUS = 20;
     private REQUIRED_CURVE_ON_SCREEN_RATIO = 0.50; // 50% of a curves points must be on screen or it will be deleted
 
     // action recorder
@@ -346,8 +346,8 @@ export class GraphSketcher {
 
         let mousePosition: Point = GraphUtils.getMousePt(e);
 
-        function detect(x: number, y: number) {
-            return (Math.abs(mousePosition[0] - x) < 5 && Math.abs(mousePosition[1] - y) < 5);
+        const detect = (x: number, y: number) => {
+            return (Math.abs(mousePosition[0] - x) < this.MOUSE_DETECT_RADIUS && Math.abs(mousePosition[1] - y) < this.MOUSE_DETECT_RADIUS);
         }
 
         // this function does not react if the mouse is over buttons or outside the canvas.
@@ -373,9 +373,9 @@ export class GraphSketcher {
         // stretch box
         if (isDefined(this.clickedCurveIdx) && isDefined(this._state.curves)) {
             let c = this._state.curves[this.clickedCurveIdx];
-            if (mousePosition[0] >= c.minX && mousePosition[0] <= c.maxX && mousePosition[1] >= c.minY && mousePosition[1] <= c.maxY) {
-                this.p.cursor(this.p.MOVE);
-            } else if (detect(c.minX, c.minY) || detect(c.maxX, c.minY) || detect(c.minX, c.maxY) || detect(c.maxX, c.maxY)) {
+            let isDraggable = false;
+            if (detect(c.minX, c.minY) || detect(c.maxX, c.minY) || detect(c.minX, c.maxY) || detect(c.maxX, c.maxY)) {
+                isDraggable = true;
                 this.p.push();
                 this.p.fill(this.graphView.KNOT_DETECT_COLOR);
                 if (detect(c.minX, c.minY)) {
@@ -393,7 +393,7 @@ export class GraphSketcher {
                 this.p.cursor(this.p.MOVE);
             } else if (detect((c.minX + c.maxX) / 2, c.minY - 3) || detect((c.minX + c.maxX) / 2, c.maxY + 3) ||
                        detect(c.minX - 3, (c.minY + c.maxY) / 2) || detect(c.maxX + 3, (c.minY + c.maxY) / 2)) {
-
+                isDraggable = true;
                 this.p.push();
                 this.p.fill(this.graphView.KNOT_DETECT_COLOR);
                 if (detect((c.minX + c.maxX) / 2, c.minY - 3)) {
@@ -408,6 +408,12 @@ export class GraphSketcher {
                 this.p.pop();
 
                 this.p.cursor(this.p.MOVE);
+            } else if (mousePosition[0] >= c.minX && mousePosition[0] <= c.maxX && mousePosition[1] >= c.minY && mousePosition[1] <= c.maxY) {
+                this.graphView.drawStretchBox(this.clickedCurveIdx, this._state.curves);
+                this.p.cursor(this.p.MOVE);
+            }
+            if (!isDraggable) {
+                this.graphView.drawStretchBox(this.clickedCurveIdx, this._state.curves);
             }
         }
     }
@@ -446,8 +452,8 @@ export class GraphSketcher {
             this.graphView.debugDrawCoordinates(mousePosition)
         }
 
-        function detect(x: number, y: number) {
-            return (Math.abs(mousePosition[0] - x) < 20 && Math.abs(mousePosition[1] - y) < 20);
+        const detect = (x: number, y: number) => {
+            return (Math.abs(mousePosition[0] - x) < this.MOUSE_DETECT_RADIUS && Math.abs(mousePosition[1] - y) < this.MOUSE_DETECT_RADIUS);
         }
         // record down mousePosition status, may be used later for undo.
         this.checkPoint = {};
