@@ -358,7 +358,7 @@ export function findInterceptY(canvasProperties: CanvasProperties, pts: Point[])
     return intercepts;
 };
 
-export function findTurnPts(pts: Point[], mode: string) {
+export function findTurnPts(pts: Point[], mode: string, isClosed: boolean = false) {
     if (pts.length == 0) {
         return [];
     }
@@ -370,9 +370,21 @@ export function findTurnPts(pts: Point[], mode: string) {
     let pot_min = [];
     let CUTOFF = 10;
 
-    for (let i = CUTOFF; i < pts.length-CUTOFF; i++) {
-        if ((pts[i][1] < pts[i-1][1] && pts[i][1] < pts[i+1][1]) || (pts[i][1] > pts[i-1][1] && pts[i][1] > pts[i+1][1]) || (pts[i][1] == pts[i-1][1])) {
-            potentialPts.push(createPoint(pts[i][0], pts[i][1]));
+    function mod(n: number, m: number) {
+        return ((n % m) + m) % m;
+    }
+
+    if (isClosed) {
+        for (let i = 0; i < pts.length-1; i++) {
+            if ((pts[i][1] < pts[mod(i-1, pts.length)][1] && pts[i][1] < pts[mod(i+1, pts.length)][1]) || (pts[i][1] > pts[mod(i-1, pts.length)][1] && pts[i][1] > pts[mod(i+1, pts.length)][1]) || (pts[i][1] == pts[mod(i-1, pts.length)][1])) {
+                potentialPts.push(createPoint(pts[i][0], pts[i][1]));
+            }
+        }
+    } else {
+        for (let i = CUTOFF; i < pts.length-1-CUTOFF; i++) {
+            if ((pts[i][1] < pts[i-1][1] && pts[i][1] < pts[i+1][1]) || (pts[i][1] > pts[i-1][1] && pts[i][1] > pts[i+1][1]) || (pts[i][1] == pts[i-1][1])) {
+                potentialPts.push(createPoint(pts[i][0], pts[i][1]));
+            }
         }
     }
 
@@ -401,9 +413,9 @@ export function findTurnPts(pts: Point[], mode: string) {
             }
         }
         if (!isDefined(position)) continue;
-        if (statPts[i][1] < pts[position-5][1] && statPts[i][1] < pts[position+5][1]) {
+        if (statPts[i][1] < pts[mod(position-5, pts.length)][1] && statPts[i][1] < pts[mod(position+5, pts.length)][1]) {
             pot_max.push(statPts[i]);
-        } else if (statPts[i][1] > pts[position-5][1] && statPts[i][1] > pts[position+5][1]) {
+        } else if (statPts[i][1] > pts[mod(position-5, pts.length)][1] && statPts[i][1] > pts[mod(position+5, pts.length)][1]) {
             pot_min.push(statPts[i]);
         }
     }

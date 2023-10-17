@@ -18,6 +18,7 @@ export class Curve {
     maxima: Point[] = [];
     minima: Point[] = [];
     colorIdx: number = -1;
+    isClosed: boolean = false;
 }
 
 export interface CanvasProperties {
@@ -864,6 +865,10 @@ export class GraphSketcher {
 
                 let pts: Point[] = [];
                 if (this.selectedLineType === LineType.BEZIER) {
+                    if (GraphUtils.getDist(this.drawnPts[0], this.drawnPts[this.drawnPts.length - 1]) < 15) {
+                        this.drawnPts.push(this.drawnPts[0]);
+                        curve.isClosed = true;
+                    }
                     pts = GraphUtils.bezierLineStyle(GraphUtils.sample(this.drawnPts));
                 } else if (this.selectedLineType === LineType.LINEAR) {
                     pts = GraphUtils.linearLineStyle([this.drawnPts[0],this.drawnPts[this.drawnPts.length-1]])
@@ -890,8 +895,8 @@ export class GraphSketcher {
                 curve.interX = GraphUtils.findInterceptX(this.canvasProperties, pts);
                 curve.interY = GraphUtils.findInterceptY(this.canvasProperties, pts);
                 if (this.selectedLineType === LineType.BEZIER) {
-                    curve.maxima = GraphUtils.findTurnPts(pts, 'maxima');
-                    curve.minima = GraphUtils.findTurnPts(pts, 'minima');
+                    curve.maxima = GraphUtils.findTurnPts(pts, 'maxima', curve.isClosed);
+                    curve.minima = GraphUtils.findTurnPts(pts, 'minima', curve.isClosed);
                 } else {
                     curve.maxima = [];
                     curve.minima = [];
