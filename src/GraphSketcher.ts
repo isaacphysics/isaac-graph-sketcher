@@ -575,7 +575,14 @@ export class GraphSketcher {
             if (!selectedCurve.isClosed) {
                 importantPoints.push(...selectedCurve.endPt);
             }
-            importantPoints.push(...outermostPts, ...selectedCurve.maxima, ...selectedCurve.minima);
+
+            const transposePoint = (pt: Point) => [pt[1], pt[0]];
+            const transposedSelectedCurvePts = selectedCurve.pts.map(transposePoint);
+            
+            const yMaxima = GraphUtils.findTurnPts(transposedSelectedCurvePts, 'maxima', selectedCurve.isClosed);
+            const yMinima = GraphUtils.findTurnPts(transposedSelectedCurvePts, 'minima', selectedCurve.isClosed);
+
+            importantPoints.push(...outermostPts, ...selectedCurve.maxima, ...selectedCurve.minima, ...yMinima, ...yMaxima);
             // remove duplicates
             importantPoints = importantPoints.filter((v, i) => importantPoints.findIndex((w) => _isEqual(v, w)) === i);
             importantPoints.sort(GraphUtils.sortByPointOrder.bind(this, selectedCurve.pts));
