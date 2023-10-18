@@ -493,12 +493,11 @@ export class GraphSketcher {
             for (let i = 0; i < this._state.curves.length; i++) {
                 let maxima = this._state.curves[i].maxima;
                 let minima = this._state.curves[i].minima;
-                let extrema = _cloneDeep(minima);
-                extrema.push(...maxima);
-                extrema.sort(GraphUtils.sortByPointOrder.bind(this, this._state.curves[i].pts));
+                let draggablePoints = minima.concat(maxima, GraphUtils.findEndPts(this._state.curves[i].pts));
+                draggablePoints.sort(GraphUtils.sortByPointOrder.bind(this, this._state.curves[i].pts));
 
-                for (let j = 0; j < extrema.length; j++) {
-                    let knot = extrema[j];
+                for (let j = 0; j < draggablePoints.length; j++) {
+                    let knot = draggablePoints[j];
                     if (GraphUtils.getDist(mousePosition, knot) < this.MOUSE_DETECT_RADIUS + 10) {
                         this.clickedCurve = i;
                         this.action = Action.STRETCH_POINT;
