@@ -99,11 +99,8 @@ Converts all curves held in GraphSketcherState from abstract Cartesian coordinat
  */
 export function decodeData(data: GraphSketcherState, canvasProperties: CanvasProperties): GraphSketcherState {
 
-    function denormalisePoint(point: Point): Point|null {
-        if (point) {
-            return createPoint(denormalise(point[0], Dimension.X), denormalise(point[1], Dimension.Y))
-        }
-        return null
+    function denormalisePoint(point: Point): Point {
+        return createPoint(denormalise(point[0], Dimension.X), denormalise(point[1], Dimension.Y));
     }
 
     function denormalise(value: number, dimension: Dimension) {
@@ -115,23 +112,30 @@ export function decodeData(data: GraphSketcherState, canvasProperties: CanvasPro
         return 0
     }
 
-    let clonedCurves = _clone(data.curves);
+    const normalisedCurves = [];
 
-    for (let curve of clonedCurves) {
-        curve.pts = curve.pts.map((point: Point) => denormalisePoint(point))
+    for (const c of data.curves ?? []) {
+        const curve = new Curve();
+        curve.pts = c.pts.map((point: Point) => denormalisePoint(point));
+        
+        curve.minX = denormalise(c.minX, Dimension.X);
+        curve.maxX = denormalise(c.maxX, Dimension.X);
+        // denormalising the Y coordinate multiplies by -1, so max becomes min and vice versa
+        curve.minY = denormalise(c.maxY, Dimension.Y);
+        curve.maxY = denormalise(c.minY, Dimension.Y);
+        
+        curve.interX = c.interX.map((point: Point) => denormalisePoint(point));
+        curve.interY = c.interY.map((point: Point) => denormalisePoint(point));
+        curve.maxima = c.maxima.map((point: Point) => denormalisePoint(point));
+        curve.minima = c.minima.map((point: Point) => denormalisePoint(point));
 
-        curve.minX = curve.minX? denormalise(curve.minX, Dimension.X) : null
-        curve.maxX = curve.maxX? denormalise(curve.maxX, Dimension.X) : null
-        curve.minY = curve.minY? denormalise(curve.minY, Dimension.Y) : null
-        curve.maxY = curve.maxY? denormalise(curve.maxY, Dimension.Y) : null
+        curve.colorIdx = c.colorIdx;
+        curve.isClosed = c.isClosed;
 
-        curve.interX = curve.interX.map((point: Point) => denormalisePoint(point))
-        curve.interY = curve.interY.map((point: Point) => denormalisePoint(point))
-        curve.maxima = curve.maxima.map((point: Point) => denormalisePoint(point))
-        curve.minima = curve.minima.map((point: Point) => denormalisePoint(point))
+        normalisedCurves.push(curve);
     }
 
-    return { curves: clonedCurves, canvasWidth: canvasProperties.widthPx, canvasHeight: canvasProperties.heightPx };
+    return { curves: normalisedCurves, canvasWidth: canvasProperties.widthPx, canvasHeight: canvasProperties.heightPx };
 };
 
 // TODO 'e' is probably a mouse event of some sort
@@ -508,11 +512,6 @@ export function translateCurve(curve: Curve, dx: number, dy: number, canvasPrope
         newInterX = findInterceptX(canvasProperties, pts);
     curve.interX = moveInter(interX, newInterX);
 
-    let endPt = curve.endPt,
-        newEndPt = findEndPts(pts);
-    curve.endPt = newEndPt;
-    void endPt;
-
     let interY = curve.interY,
         newInterY = findInterceptY(canvasProperties, pts);
     curve.interY = moveInter(interY, newInterY);
@@ -714,9 +713,7 @@ export function stretchCurve(c: Curve, orx: number, ory: number, nrx: number, nr
             }
         }
     }
-
-    c.endPt = findEndPts(pts);
-
+    
     let maxima = c.maxima;
     loop1(maxima);
 

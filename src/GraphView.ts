@@ -59,7 +59,7 @@ export default class GraphView {
             this.drawKnots(curve.interY]);
             this.drawKnots(curve.maxima]);
             this.drawKnots(curve.minima]);
-            this.drawKnots(curve.endPt);
+            this.drawKnots(graphUtils.findEndPts(curve.pts));
         }
     }
 
