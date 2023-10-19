@@ -6,9 +6,9 @@ A graph sketching application for [Isaac Physics](https://isaacphysics.org).
 This graph sketcher is a dependency and cannot be run standalone.
 
 To test it locally, you will need to run `yarn link` in this project, and then `yarn link "isaac-graph-sketcher"` in the 
-project you want to test it in.
+project you want to test it in. Next, build this project with `yarn run build`. 
 
-You will need to run `yarn run build` on this project to update the dependency when changes are made. This should hot-reload
+You will need to run `yarn run build` on this project again to update the dependency when changes are made. This should hot-reload
 the client if set up as described.
 
 ## Usage
