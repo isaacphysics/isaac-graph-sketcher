@@ -554,23 +554,23 @@ export function stretchTurningPoint(importantPoints: Point[], e: MouseEvent | To
             mousePosition[1] = currImportant[1];
         }
 
-        let currentPointList = (prevImportant) ? 0 : 1;
+        let currentSectionState = (prevImportant) ? 0 : 1;
 
         // this must be run before the switch if there is no earlier important point,
         // and must be run after the switch if there is no later important point.
         // cases with both work with either position.
-        const incrementListCounter = (pt : Point) => {
+        const updateSectionState = (pt : Point) => {
             if (_isEqual(pt, prevImportant) || _isEqual(pt, currImportant) || _isEqual(pt, nextImportant)) {
-                currentPointList = (currentPointList + 1) % 4;
+                currentSectionState = (currentSectionState + 1) % 4;
             }
         }
 
         selectedCurve.pts.forEach(pt => {
             if (!isDefined(prevImportant)) {
-                incrementListCounter(pt);
+                updateSectionState(pt);
             }
 
-            switch (currentPointList) {
+            switch (currentSectionState) {
                 case 0:
                     leftStaticPoints.push(pt);
                     break;
@@ -586,7 +586,7 @@ export function stretchTurningPoint(importantPoints: Point[], e: MouseEvent | To
             }
 
             if (isDefined(prevImportant)) {
-                incrementListCounter(pt);
+                updateSectionState(pt);
             }
         });
         selectedCurve.pts = [];
