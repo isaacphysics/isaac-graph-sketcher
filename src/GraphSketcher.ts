@@ -631,56 +631,44 @@ export class GraphSketcher {
             // update the position of stretched vertex
             switch (this.stretchMode) {
                 case "bottomLeft":
-                    if (orx < 30 && dx > 0  || ory < 30 && dy > 0) {
-                        return;
-                    }
-                    currentCurve.minX += dx;
-                    currentCurve.minY += dy;
+                    currentCurve.minX += (orx < 30 && dx > 0) ? 0 : dx + Math.min(0, currentCurve.maxX - (currentCurve.minX + dx) - 30);
+                    currentCurve.minY += (ory < 30 && dy > 0) ? 0 : dy + Math.min(0, currentCurve.maxY - (currentCurve.minY + dy) - 30);
                     break;
                 case "bottomRight":
-                    if (orx < 30 && dx < 0 || ory < 30 && dy > 0) {
-                        return;
-                    }
-                    currentCurve.maxX += dx;
-                    currentCurve.minY += dy;
+                    currentCurve.maxX += (orx < 30 && dx < 0) ? 0 : dx - Math.min(0, (currentCurve.maxX + dx) - currentCurve.minX - 30);
+                    currentCurve.minY += (ory < 30 && dy > 0) ? 0 : dy + Math.min(0, currentCurve.maxY - (currentCurve.minY + dy) - 30);
                     break;
                 case "topRight":
-                    if (orx < 30 && dx < 0 || ory < 30 && dy < 0) {
-                        return;
-                    }
-                    currentCurve.maxX += dx;
-                    currentCurve.maxY += dy;
+                    currentCurve.maxX += (orx < 30 && dx < 0) ? 0 : dx - Math.min(0, (currentCurve.maxX + dx) - currentCurve.minX - 30);
+                    currentCurve.maxY += (ory < 30 && dy < 0) ? 0 : dy - Math.min(0, (currentCurve.maxY + dy) - currentCurve.minY - 30);
                     break;
                 case "topLeft":
-                    if (orx < 30 && dy > 0 || ory < 30 && dy < 0) {
-                        return;
-                    }
-                    currentCurve.minX += dx;
-                    currentCurve.maxY += dy;
+                    currentCurve.minX += (orx < 30 && dx > 0) ? 0 : dx + Math.min(0, currentCurve.maxX - (currentCurve.minX + dx) - 30);
+                    currentCurve.maxY += (ory < 30 && dy < 0) ? 0 : dy - Math.min(0, (currentCurve.maxY + dy) - currentCurve.minY - 30);
                     break;
                 case "bottomMiddle":
                     if ( ory < 30 && dy > 0) {
                         return;
                     }
-                    currentCurve.minY += dy;
+                    currentCurve.minY += dy + Math.min(0, currentCurve.maxY - (currentCurve.minY + dy) - 30);
                     break;
                 case "topMiddle":
                     if (ory < 30 && dy < 0) {
                         return;
                     }
-                    currentCurve.maxY += dy;
+                    currentCurve.maxY += dy - Math.min(0, (currentCurve.maxY + dy) - currentCurve.minY - 30);
                     break;
                 case "leftMiddle":
                     if (orx < 30 && dx > 0) {
                         return;
                     }
-                    currentCurve.minX += dx;
+                    currentCurve.minX += dx + Math.min(0, currentCurve.maxX - (currentCurve.minX + dx) - 30);
                     break;
                 case "rightMiddle":
                     if (orx < 30 && dx < 0) {
                         return;
                     }
-                    currentCurve.maxX += dx;
+                    currentCurve.maxX += dx - Math.min(0, (currentCurve.maxX + dx) - currentCurve.minX - 30);
                     break;
             }
 
