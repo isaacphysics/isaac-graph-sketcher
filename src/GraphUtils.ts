@@ -1,4 +1,5 @@
 import {CanvasProperties, Curve, Dimension, GraphSketcherState, LineType, Point} from "./GraphSketcher";
+import _isEqual from 'lodash/isEqual';
 
 // undefined|null checker and type guard all-in-wonder.
 // Why is this not in Typescript?
@@ -173,7 +174,6 @@ export function setCurveProperties(curve: Curve, pts: Point[], selectedLineType:
     curve.minY = minY;
     curve.maxY = maxY;
 
-    curve.endPt = findEndPts(pts);
     curve.interX = findInterceptX(canvasProperties, pts);
     curve.interY = findInterceptY(canvasProperties, pts);
     if (selectedLineType === LineType.BEZIER) {
