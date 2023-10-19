@@ -1,4 +1,4 @@
-import {CanvasProperties, Curve, Dimension, GraphSketcherState, Point} from "./GraphSketcher";
+import {CanvasProperties, Curve, Dimension, GraphSketcherState, LineType, Point} from "./GraphSketcher";
 
 // undefined|null checker and type guard all-in-wonder.
 // Why is this not in Typescript?
@@ -12,6 +12,10 @@ const numOfPts = 100;
 // methods used in manipulating the graphs
 export function getDist(pt1: Point, pt2: Point) {
     return Math.sqrt(Math.pow(pt1[0] - pt2[0], 2) + Math.pow(pt1[1] - pt2[1], 2));
+}
+
+export function getAngle(pt1: Point, pt2: Point) {
+    return Math.atan2(pt2[1] - pt1[1], pt2[0] - pt1[0]);
 }
 
 /*
@@ -141,6 +145,37 @@ export function createPoint(x: number, y: number) {
     let obj = [x, y];
     return obj;
 };
+
+export function setCurveProperties(curve: Curve, pts: Point[], selectedLineType: LineType, canvasProperties: CanvasProperties, colorIdx: number) {
+    curve.pts = pts;
+
+    let minX = pts[0][0];
+    let maxX = pts[0][0];
+    let minY = pts[0][1];
+    let maxY = pts[0][1];
+    for (let i = 1; i < pts.length; i++) {
+        minX = Math.min(pts[i][0], minX);
+        maxX = Math.max(pts[i][0], maxX);
+        minY = Math.min(pts[i][1], minY);
+        maxY = Math.max(pts[i][1], maxY);
+    }
+    curve.minX = minX;
+    curve.maxX = maxX;
+    curve.minY = minY;
+    curve.maxY = maxY;
+
+    curve.endPt = findEndPts(pts);
+    curve.interX = findInterceptX(canvasProperties, pts);
+    curve.interY = findInterceptY(canvasProperties, pts);
+    if (selectedLineType === LineType.BEZIER) {
+        curve.maxima = findTurnPts(pts, 'maxima');
+        curve.minima = findTurnPts(pts, 'minima');
+    } else {
+        curve.maxima = [];
+        curve.minima = [];
+    }
+    curve.colorIdx = colorIdx;
+}
 
 export function linearLineStyle(pts: Point[]) {
     pts.sort(function(a, b){return a[0] - b[0]});
@@ -509,6 +544,21 @@ export function translateCurve(curve: Curve, dx: number, dy: number, canvasPrope
 
     return;
 };
+
+export function rotateCurve(curve: Curve, angle: number, center: Point) {
+    let pts = curve.pts;
+    
+    function rotatePoint(point: Point, angle: number, center: Point) {
+        let x = point[0] - center[0];
+        let y = point[1] - center[1];
+        let cos = Math.cos(angle);
+        let sin = Math.sin(angle);
+        point[0] = x * cos - y * sin + center[0];
+        point[1] = x * sin + y * cos + center[1];
+    }
+
+    pts.map(pt => rotatePoint(pt, angle, center));
+}
 
 export function stretchTurningPoint(importantPoints: Point[], e: MouseEvent | TouchEvent | Touch, selectedCurve: Curve, isMaxima: boolean, selectedPointIndex: number|undefined, prevMousePt: Point, canvasProperties: CanvasProperties) {
     if (!isDefined(selectedPointIndex)) return;
