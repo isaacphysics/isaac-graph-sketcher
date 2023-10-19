@@ -8,7 +8,7 @@ export function isDefined<T>(stuff: T): stuff is NonNullable<T> {
 }
 
 const SAMPLE_INTERVAL = 10;
-const numOfPts = 100;
+const numOfPts = 200;
 
 // methods used in manipulating the graphs
 export function getDist(pt1: Point, pt2: Point) {
@@ -137,8 +137,8 @@ export function detect(e: MouseEvent, x: number, y: number) {
 };
 
 export function getMousePt(e: any) {
-    let x = (e.clientX - 5);
-    let y = (e.clientY - 5);
+    let x = e.clientX + (e instanceof TouchEvent ? 5 : 0);
+    let y = e.clientY + (e instanceof TouchEvent ? 5 : 0);
     return createPoint(x, y);
 };
 
@@ -309,25 +309,6 @@ export function findEndPts(pts: Point[]): Point[] {
     ends.push(createPoint(pts[0][0], pts[0][1]));
     ends.push(createPoint(pts[pts.length - 1][0], pts[pts.length - 1][1]));
 
-    // 200 acceptable for showing a curve is no longer just one line
-    for (let i = 1; i < pts.length; i++) {
-        if (pts[i-1][0] - pts[i][0] > 200) {
-            ends.push(createPoint(pts[i-1][0], pts[i-1][1]));
-            ends.push(createPoint(pts[i][0], pts[i][1]));
-            continue;
-        }
-    }
-
-    if (ends.length == 2) {
-        for (let i = pts.length - 2; i > 1; i--) {
-            if (pts[i+1][0] - pts[i][0] > 200) {
-                ends.push(createPoint(pts[i+1][0], pts[i+1][1]));
-                ends.push(createPoint(pts[i][0], pts[i][1]));
-                continue;
-            }
-        }
-    }
-
     return ends;
 };
 
@@ -404,22 +385,6 @@ export function findTurnPts(pts: Point[], mode: string, isClosed: boolean = fals
             }
         }
     }
-
-    // let stationaryArrays = Object.create(null);
-
-    // loop over turn pts and put them in arrays by same y value
-    // potentialPts.forEach(function(pt) {
-    //     let stationaryArray = stationaryArrays[pt[1]];
-    //     if (!stationaryArray) {
-    //         stationaryArray = stationaryArrays[pt[1]] = [];
-    //     }
-    //     stationaryArray.push(pt);
-    // });
-
-    // Object.keys(stationaryArrays).forEach(function(key) {
-    //     let middle = stationaryArrays[key][Math.floor(stationaryArrays[key].length / 2)];
-    //     statPts.push(middle);
-    // });
 
     statPts = potentialPts;
 
@@ -565,15 +530,13 @@ export function stretchTurningPoint(importantPoints: Point[], e: MouseEvent | To
         if (!isDefined(definedImportant)) return;
         if (definedImportant[0] - currImportant[0] > 0) {
             withinXBoundary = (definedImportant[0] - mousePosition[0]) > XBUFFER;
-        }
-        if (definedImportant[0] - currImportant[0] < 0) {
-            withinXBoundary = (definedImportant[0] - mousePosition[0]) < XBUFFER;
+        } else {
+            withinXBoundary = (mousePosition[0] - definedImportant[0]) > XBUFFER;
         }
         if (definedImportant[1] - currImportant[1] > 0) {
             withinYBoundary = (definedImportant[1] - mousePosition[1]) > YBUFFER;
-        }
-        if (definedImportant[1] - currImportant[1] < 0) {
-            withinYBoundary = (definedImportant[1] - mousePosition[1]) < YBUFFER;
+        } else {
+            withinYBoundary = (mousePosition[1] - definedImportant[1]) > YBUFFER;
         }
     }
 
@@ -645,8 +608,6 @@ export function stretchTurningPoint(importantPoints: Point[], e: MouseEvent | To
         }
 
         currImportant = mousePosition;
-
-        console.log(prevImportant, currImportant, nextImportant);
 
         selectedCurve.pts.push.apply(selectedCurve.pts, leftStaticPoints);
         selectedCurve.pts.push.apply(selectedCurve.pts, leftStretchedCurve.pts);

@@ -579,8 +579,8 @@ export class GraphSketcher {
             const transposePoint = (pt: Point) => [pt[1], pt[0]];
             const transposedSelectedCurvePts = selectedCurve.pts.map(transposePoint);
             
-            const yMaxima = GraphUtils.findTurnPts(transposedSelectedCurvePts, 'maxima', selectedCurve.isClosed);
-            const yMinima = GraphUtils.findTurnPts(transposedSelectedCurvePts, 'minima', selectedCurve.isClosed);
+            const yMaxima = GraphUtils.findTurnPts(transposedSelectedCurvePts, 'maxima', selectedCurve.isClosed).map(transposePoint);
+            const yMinima = GraphUtils.findTurnPts(transposedSelectedCurvePts, 'minima', selectedCurve.isClosed).map(transposePoint);
 
             importantPoints.push(...outermostPts, ...selectedCurve.maxima, ...selectedCurve.minima, ...yMinima, ...yMaxima);
             // remove duplicates
