@@ -62,7 +62,7 @@ export class GraphSketcher {
     public  checkPointsRedo: any[] = [];
 
     private CURVE_LIMIT = 3;
-    private MOUSE_DETECT_RADIUS = 10;
+    private MOUSE_DETECT_RADIUS = 20;
     private REQUIRED_CURVE_ON_SCREEN_RATIO = 0.50; // 50% of a curves points must be on screen or it will be deleted
 
     // action recorder
@@ -349,8 +349,8 @@ export class GraphSketcher {
 
         let mousePosition: Point = GraphUtils.getMousePt(e);
 
-        function detect(x: number, y: number) {
-            return (Math.abs(mousePosition[0] - x) < 5 && Math.abs(mousePosition[1] - y) < 5);
+        const detect = (x: number, y: number) => {
+            return (Math.abs(mousePosition[0] - x) < this.MOUSE_DETECT_RADIUS && Math.abs(mousePosition[1] - y) < this.MOUSE_DETECT_RADIUS);
         }
 
         // this function does not react if the mouse is over buttons or outside the canvas.
@@ -384,9 +384,9 @@ export class GraphSketcher {
         // stretch box
         if (isDefined(this.clickedCurveIdx) && isDefined(this._state.curves)) {
             let c = this._state.curves[this.clickedCurveIdx];
-            if (mousePosition[0] >= c.minX && mousePosition[0] <= c.maxX && mousePosition[1] >= c.minY && mousePosition[1] <= c.maxY) {
-                this.p.cursor(this.p.MOVE);
-            } else if (detect(c.minX, c.minY) || detect(c.maxX, c.minY) || detect(c.minX, c.maxY) || detect(c.maxX, c.maxY)) {
+            let isDraggable = false;
+            if (detect(c.minX, c.minY) || detect(c.maxX, c.minY) || detect(c.minX, c.maxY) || detect(c.maxX, c.maxY)) {
+                isDraggable = true;
                 this.p.push();
                 this.p.fill(this.graphView.KNOT_DETECT_COLOR);
                 if (detect(c.minX, c.minY)) {
@@ -404,7 +404,7 @@ export class GraphSketcher {
                 this.p.cursor(this.p.MOVE);
             } else if (detect((c.minX + c.maxX) / 2, c.minY - 3) || detect((c.minX + c.maxX) / 2, c.maxY + 3) ||
                        detect(c.minX - 3, (c.minY + c.maxY) / 2) || detect(c.maxX + 3, (c.minY + c.maxY) / 2)) {
-
+                isDraggable = true;
                 this.p.push();
                 this.p.fill(this.graphView.KNOT_DETECT_COLOR);
                 if (detect((c.minX + c.maxX) / 2, c.minY - 3)) {
@@ -430,6 +430,12 @@ export class GraphSketcher {
                 } else {
                     makeDiamond(c.maxX + 16, c.maxY + 16, 4);
                 }
+            } else if (mousePosition[0] >= c.minX && mousePosition[0] <= c.maxX && mousePosition[1] >= c.minY && mousePosition[1] <= c.maxY) {
+                this.graphView.drawStretchBox(this.clickedCurveIdx, this._state.curves);
+                this.p.cursor(this.p.MOVE);
+            }
+            if (!isDraggable) {
+                this.graphView.drawStretchBox(this.clickedCurveIdx, this._state.curves);
             }
         }
     }
@@ -482,8 +488,8 @@ export class GraphSketcher {
             this.graphView.debugDrawCoordinates(mousePosition)
         }
 
-        function detect(x: number, y: number) {
-            return (Math.abs(mousePosition[0] - x) < 20 && Math.abs(mousePosition[1] - y) < 20);
+        const detect = (x: number, y: number) => {
+            return (Math.abs(mousePosition[0] - x) < this.MOUSE_DETECT_RADIUS && Math.abs(mousePosition[1] - y) < this.MOUSE_DETECT_RADIUS);
         }
         // record down mousePosition status, may be used later for undo.
         this.checkPoint = {};
@@ -665,56 +671,44 @@ export class GraphSketcher {
             // update the position of stretched vertex
             switch (this.stretchMode) {
                 case "bottomLeft":
-                    if (orx < 30 && dx > 0  || ory < 30 && dy > 0) {
-                        return;
-                    }
-                    currentCurve.minX += dx;
-                    currentCurve.minY += dy;
+                    currentCurve.minX += (orx < 30 && dx > 0) ? 0 : dx + Math.min(0, currentCurve.maxX - (currentCurve.minX + dx) - 30);
+                    currentCurve.minY += (ory < 30 && dy > 0) ? 0 : dy + Math.min(0, currentCurve.maxY - (currentCurve.minY + dy) - 30);
                     break;
                 case "bottomRight":
-                    if (orx < 30 && dx < 0 || ory < 30 && dy > 0) {
-                        return;
-                    }
-                    currentCurve.maxX += dx;
-                    currentCurve.minY += dy;
+                    currentCurve.maxX += (orx < 30 && dx < 0) ? 0 : dx - Math.min(0, (currentCurve.maxX + dx) - currentCurve.minX - 30);
+                    currentCurve.minY += (ory < 30 && dy > 0) ? 0 : dy + Math.min(0, currentCurve.maxY - (currentCurve.minY + dy) - 30);
                     break;
                 case "topRight":
-                    if (orx < 30 && dx < 0 || ory < 30 && dy < 0) {
-                        return;
-                    }
-                    currentCurve.maxX += dx;
-                    currentCurve.maxY += dy;
+                    currentCurve.maxX += (orx < 30 && dx < 0) ? 0 : dx - Math.min(0, (currentCurve.maxX + dx) - currentCurve.minX - 30);
+                    currentCurve.maxY += (ory < 30 && dy < 0) ? 0 : dy - Math.min(0, (currentCurve.maxY + dy) - currentCurve.minY - 30);
                     break;
                 case "topLeft":
-                    if (orx < 30 && dy > 0 || ory < 30 && dy < 0) {
-                        return;
-                    }
-                    currentCurve.minX += dx;
-                    currentCurve.maxY += dy;
+                    currentCurve.minX += (orx < 30 && dx > 0) ? 0 : dx + Math.min(0, currentCurve.maxX - (currentCurve.minX + dx) - 30);
+                    currentCurve.maxY += (ory < 30 && dy < 0) ? 0 : dy - Math.min(0, (currentCurve.maxY + dy) - currentCurve.minY - 30);
                     break;
                 case "bottomMiddle":
                     if ( ory < 30 && dy > 0) {
                         return;
                     }
-                    currentCurve.minY += dy;
+                    currentCurve.minY += dy + Math.min(0, currentCurve.maxY - (currentCurve.minY + dy) - 30);
                     break;
                 case "topMiddle":
                     if (ory < 30 && dy < 0) {
                         return;
                     }
-                    currentCurve.maxY += dy;
+                    currentCurve.maxY += dy - Math.min(0, (currentCurve.maxY + dy) - currentCurve.minY - 30);
                     break;
                 case "leftMiddle":
                     if (orx < 30 && dx > 0) {
                         return;
                     }
-                    currentCurve.minX += dx;
+                    currentCurve.minX += dx + Math.min(0, currentCurve.maxX - (currentCurve.minX + dx) - 30);
                     break;
                 case "rightMiddle":
                     if (orx < 30 && dx < 0) {
                         return;
                     }
-                    currentCurve.maxX += dx;
+                    currentCurve.maxX += dx - Math.min(0, (currentCurve.maxX + dx) - currentCurve.minX - 30);
                     break;
             }
 
@@ -789,12 +783,24 @@ export class GraphSketcher {
                 this.p.push();
                 this.p.stroke(this.graphView.CURVE_COLORS[this.drawnColorIdx]);
                 this.p.strokeWeight(this.graphView.CURVE_STRKWEIGHT);
-                if (this.drawnPts.length > 0) {
-                    let precedingPoint = this.drawnPts[this.drawnPts.length - 1];
-                    this.p.line(precedingPoint[0], precedingPoint[1], constrainedMouseX, constrainedMouseY);
+                if (this.selectedLineType === LineType.LINEAR) {
+                    this.reDraw();
+                    if (this.drawnPts.length > 1) {
+                        const initialPoint = this.drawnPts[0];
+                        this.p.line(initialPoint[0], initialPoint[1], constrainedMouseX, constrainedMouseY);                        
+                        this.drawnPts.pop();
+                    }
+                    this.p.pop();
+                    this.drawnPts.push([constrainedMouseX, constrainedMouseY]);
+                } else {
+                    if (this.drawnPts.length > 0) {
+                        const precedingPoint = this.drawnPts[this.drawnPts.length - 1];
+                        this.p.line(precedingPoint[0], precedingPoint[1], constrainedMouseX, constrainedMouseY);
+                    }
+                    this.p.pop();
+                    this.drawnPts.push([constrainedMouseX, constrainedMouseY]);
                 }
-                this.p.pop();
-                this.drawnPts.push([constrainedMouseX, constrainedMouseY]);
+
             }
         }
     }
@@ -878,7 +884,7 @@ export class GraphSketcher {
 
             if (isDefined(this._state.curves) && this._state.curves.length < this.CURVE_LIMIT){
 
-                if (this.drawnPts.length < 3) {
+                if (this.drawnPts.length < 3 && this.selectedLineType !== LineType.LINEAR) {
                     // If the curve is too short or mostly outside the plot, don't add it
                     return;
                 }
