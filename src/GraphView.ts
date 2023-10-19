@@ -29,13 +29,13 @@ export default class GraphView {
         this.refreshBackground();
     }
 
-    drawCurves(curves: Curve[], color = -1) {
+    drawCurves(curves: Curve[], color = -1, hiddenKnots?: number[]) {
         for (let i = 0; i < curves.length; i++) {
-            this.drawCurve(curves[i], color);
+            this.drawCurve(curves[i], color, hiddenKnots ? !hiddenKnots.includes(i) : true);
         }
     }
 
-    drawCurve(curve: Curve, color: number) {
+    drawCurve(curve: Curve, color: number, drawKnots: boolean) {
         let chosenColor = color < 0 ? this.CURVE_COLORS[curve.colorIdx] : this.CURVE_COLORS[color];
 
         this.p.push();
@@ -52,12 +52,15 @@ export default class GraphView {
 
         this.p.pop();
 
-        // draw x intercepts, y intercepts and turning points
-        this.drawKnots(curve.interX);
-        this.drawKnots(curve.interY);
-        this.drawKnots(curve.maxima);
-        this.drawKnots(curve.minima);
-        this.drawKnots(graphUtils.findEndPts(curve.pts));
+        curve.endPt = graphUtils.findEndPts(curve.pts);
+        if (drawKnots) {   
+            // draw x intercepts, y intercepts and turning points
+            this.drawKnots(curve.interX]);
+            this.drawKnots(curve.interY]);
+            this.drawKnots(curve.maxima]);
+            this.drawKnots(curve.minima]);
+            this.drawKnots(graphUtils.findEndPts(curve.pts));
+        }
     }
 
     drawKnots(knots: Point[], color?: number[]) {
@@ -159,6 +162,14 @@ export default class GraphView {
         this.p.pop();
     }
 
+    makeDiamond(x: number, y: number, w: number) {
+        this.p.push();
+        this.p.translate(x, y);
+        this.p.rotate(this.p.QUARTER_PI);
+        this.p.square(0, 0, w);
+        this.p.pop();
+    }
+
     drawStretchBox(idx: number | null | undefined, curves: Curve[]) {
 
         if ((!idx || (idx && !curves[idx])) && idx !== 0) return;
@@ -187,6 +198,15 @@ export default class GraphView {
         this.p.triangle((minX + maxX)/2 - 5, maxY + 2, (minX + maxX)/2 + 5, maxY + 2, (minX + maxX)/2, maxY + 7);
         this.p.triangle(minX - 2, (minY + maxY) / 2 - 5, minX - 2, (minY + maxY) / 2 + 5, minX - 7, (minY + maxY) / 2);
         this.p.triangle(maxX + 2, (minY + maxY) / 2 - 5, maxX + 2, (minY + maxY) / 2 + 5, maxX + 7, (minY + maxY) / 2);
+        // this.p.arc(minX - 4, minY - 4, 29, 29, this.p.PI + 0.2, 3*this.p.HALF_PI - 0.2, this.p.OPEN);
+        // this.p.arc(minX - 4, minY - 4, 24, 24, this.p.PI + 0.2, 3*this.p.HALF_PI - 0.2, this.p.OPEN);
+        // this.p.triangle(minX - 8, minY - 20, minX - 8, minY - 12, minX - 4, minY - 16);
+        // this.p.triangle(minX - 20, minY - 8, minX - 16, minY - 4, minX - 12, minY - 8);
+        this.makeDiamond(minX - 16, minY - 16, 4);
+        this.makeDiamond(maxX + 16, minY - 16, 4);
+        this.makeDiamond(minX - 16, maxY + 16, 4);
+        this.makeDiamond(maxX + 16, maxY + 16, 4);
+
         this.p.pop();
     }
 

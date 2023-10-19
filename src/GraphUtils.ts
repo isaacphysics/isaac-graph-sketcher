@@ -1,5 +1,4 @@
-import {CanvasProperties, Curve, Dimension, GraphSketcherState, Point} from "./GraphSketcher";
-import _isEqual from 'lodash/isEqual';
+import {CanvasProperties, Curve, Dimension, GraphSketcherState, LineType, Point} from "./GraphSketcher";
 
 // undefined|null checker and type guard all-in-wonder.
 // Why is this not in Typescript?
@@ -15,8 +14,13 @@ export function getDist(pt1: Point, pt2: Point) {
     return Math.sqrt(Math.pow(pt1[0] - pt2[0], 2) + Math.pow(pt1[1] - pt2[1], 2));
 }
 
+
 function mod(n: number, m: number) {
     return ((n % m) + m) % m;
+}
+
+export function getAngle(pt1: Point, pt2: Point) {
+    return Math.atan2(pt2[1] - pt1[1], pt2[0] - pt1[0]);
 }
 
 /*
@@ -150,6 +154,37 @@ export function createPoint(x: number, y: number) {
     let obj = [x, y];
     return obj;
 };
+
+export function setCurveProperties(curve: Curve, pts: Point[], selectedLineType: LineType, canvasProperties: CanvasProperties, colorIdx: number) {
+    curve.pts = pts;
+
+    let minX = pts[0][0];
+    let maxX = pts[0][0];
+    let minY = pts[0][1];
+    let maxY = pts[0][1];
+    for (let i = 1; i < pts.length; i++) {
+        minX = Math.min(pts[i][0], minX);
+        maxX = Math.max(pts[i][0], maxX);
+        minY = Math.min(pts[i][1], minY);
+        maxY = Math.max(pts[i][1], maxY);
+    }
+    curve.minX = minX;
+    curve.maxX = maxX;
+    curve.minY = minY;
+    curve.maxY = maxY;
+
+    curve.endPt = findEndPts(pts);
+    curve.interX = findInterceptX(canvasProperties, pts);
+    curve.interY = findInterceptY(canvasProperties, pts);
+    if (selectedLineType === LineType.BEZIER) {
+        curve.maxima = findTurnPts(pts, 'maxima');
+        curve.minima = findTurnPts(pts, 'minima');
+    } else {
+        curve.maxima = [];
+        curve.minima = [];
+    }
+    curve.colorIdx = colorIdx;
+}
 
 export function linearLineStyle(pts: Point[]) {
     pts.sort(function(a, b){return a[0] - b[0]});
@@ -484,7 +519,24 @@ export function translateCurve(curve: Curve, dx: number, dy: number, canvasPrope
     return;
 };
 
+
 export const sortByPointOrder = (pts: Point[], a: Point, b: Point) => pts.findIndex((v: Point) => _isEqual(a, v)) - pts.findIndex((v: Point) => _isEqual(b, v));
+
+export function rotateCurve(curve: Curve, angle: number, center: Point) {
+    let pts = curve.pts;
+    
+    function rotatePoint(point: Point, angle: number, center: Point) {
+        let x = point[0] - center[0];
+        let y = point[1] - center[1];
+        let cos = Math.cos(angle);
+        let sin = Math.sin(angle);
+        point[0] = x * cos - y * sin + center[0];
+        point[1] = x * sin + y * cos + center[1];
+    }
+
+    pts.map(pt => rotatePoint(pt, angle, center));
+}
+
 
 export function stretchTurningPoint(importantPoints: Point[], e: MouseEvent | TouchEvent | Touch, selectedCurve: Curve, isMaxima: boolean, selectedPointIndex: number|undefined, prevMousePt: Point, canvasProperties: CanvasProperties) {
     if (!isDefined(selectedPointIndex)) return;
@@ -553,23 +605,23 @@ export function stretchTurningPoint(importantPoints: Point[], e: MouseEvent | To
             mousePosition[1] = currImportant[1];
         }
 
-        let currentPointList = (prevImportant) ? 0 : 1;
+        let currentSectionState = (prevImportant) ? 0 : 1;
 
         // this must be run before the switch if there is no earlier important point,
         // and must be run after the switch if there is no later important point.
         // cases with both work with either position.
-        const incrementListCounter = (pt : Point) => {
+        const updateSectionState = (pt : Point) => {
             if (_isEqual(pt, prevImportant) || _isEqual(pt, currImportant) || _isEqual(pt, nextImportant)) {
-                currentPointList = (currentPointList + 1) % 4;
+                currentSectionState = (currentSectionState + 1) % 4;
             }
         }
 
         selectedCurve.pts.forEach(pt => {
             if (!isDefined(prevImportant)) {
-                incrementListCounter(pt);
+                updateSectionState(pt);
             }
 
-            switch (currentPointList) {
+            switch (currentSectionState) {
                 case 0:
                     leftStaticPoints.push(pt);
                     break;
@@ -585,7 +637,7 @@ export function stretchTurningPoint(importantPoints: Point[], e: MouseEvent | To
             }
 
             if (isDefined(prevImportant)) {
-                incrementListCounter(pt);
+                updateSectionState(pt);
             }
         });
         selectedCurve.pts = [];
