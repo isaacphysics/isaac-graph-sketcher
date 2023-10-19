@@ -12,7 +12,6 @@ export class Curve {
     maxX: number = 0;
     minY: number = 0;
     maxY: number = 0;
-    endPt?: Point[]; // This is likely a typo, should probably be endPts, but that would require changes to the checker.
     interX: Point[] = [];
     interY: Point[] = [];
     maxima: Point[] = [];
@@ -568,12 +567,11 @@ export class GraphSketcher {
             let selectedCurve = this._state.curves[this.clickedCurve];
             // we need to know the (important) ordered end and turning points
             let importantPoints: Point[] = [];
-            selectedCurve.endPt = GraphUtils.findEndPts(selectedCurve.pts)
             selectedCurve.maxima = GraphUtils.findTurnPts(selectedCurve.pts, 'maxima', selectedCurve.isClosed);
             selectedCurve.minima = GraphUtils.findTurnPts(selectedCurve.pts, 'minima', selectedCurve.isClosed);
             const outermostPts = GraphUtils.findOutermostPts(selectedCurve.pts);
             if (!selectedCurve.isClosed) {
-                importantPoints.push(...selectedCurve.endPt);
+                importantPoints.push(...GraphUtils.findEndPts(selectedCurve.pts));
             }
 
             const transposePoint = (pt: Point) => [pt[1], pt[0]];
@@ -891,7 +889,6 @@ export class GraphSketcher {
                 curve.minY = minY;
                 curve.maxY = maxY;
 
-                curve.endPt = GraphUtils.findEndPts(pts);
                 curve.interX = GraphUtils.findInterceptX(this.canvasProperties, pts);
                 curve.interY = GraphUtils.findInterceptY(this.canvasProperties, pts);
                 if (this.selectedLineType === LineType.BEZIER) {
