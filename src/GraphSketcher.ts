@@ -18,6 +18,7 @@ export class Curve {
     maxima: Point[] = [];
     minima: Point[] = [];
     colorIdx: number = -1;
+    isClosed: boolean = false;
 }
 
 export interface CanvasProperties {
@@ -542,25 +543,17 @@ export class GraphSketcher {
             for (let i = 0; i < this._state.curves.length; i++) {
                 let maxima = this._state.curves[i].maxima;
                 let minima = this._state.curves[i].minima;
-                for (let j = 0; j < maxima.length; j++) {
-                    let knot = maxima[j];
-                    if (GraphUtils.getDist(mousePosition, knot) < this.MOUSE_DETECT_RADIUS + 10){
+                let draggablePoints = minima.concat(maxima, GraphUtils.findEndPts(this._state.curves[i].pts));
+                draggablePoints.sort(GraphUtils.sortByPointOrder.bind(this, this._state.curves[i].pts));
+
+                for (let j = 0; j < draggablePoints.length; j++) {
+                    let knot = draggablePoints[j];
+                    if (GraphUtils.getDist(mousePosition, knot) < this.MOUSE_DETECT_RADIUS + 10) {
                         this.clickedCurve = i;
                         this.action = Action.STRETCH_POINT;
                         this.clickedKnotId = j;
                         this.prevMousePt = mousePosition;
-                        this.isMaxima = true;
-                        return;
-                    }
-                }
-                for (let j = 0; j < minima.length; j++) {
-                    let knot = minima[j];
-                    if (GraphUtils.getDist(mousePosition, knot) < this.MOUSE_DETECT_RADIUS + 10){
-                        this.clickedCurve = i;
-                        this.action = Action.STRETCH_POINT;
-                        this.clickedKnotId = j;
-                        this.prevMousePt = mousePosition;
-                        this.isMaxima = false;
+                        this.isMaxima = maxima.includes(knot);
                         return;
                     }
                 }
@@ -608,16 +601,24 @@ export class GraphSketcher {
             let selectedCurve = this._state.curves[this.clickedCurve];
             // we need to know the (important) ordered end and turning points
             let importantPoints: Point[] = [];
-            if (selectedCurve.pts[0][0] > selectedCurve.pts[selectedCurve.pts.length - 1][0]) {
-                selectedCurve.pts.reverse();
+            selectedCurve.endPt = GraphUtils.findEndPts(selectedCurve.pts)
+            selectedCurve.maxima = GraphUtils.findTurnPts(selectedCurve.pts, 'maxima', selectedCurve.isClosed);
+            selectedCurve.minima = GraphUtils.findTurnPts(selectedCurve.pts, 'minima', selectedCurve.isClosed);
+            const outermostPts = GraphUtils.findOutermostPts(selectedCurve.pts);
+            if (!selectedCurve.isClosed) {
+                importantPoints.push(...selectedCurve.endPt);
             }
-            selectedCurve.endPt = GraphUtils.findEndPts(selectedCurve.pts);
-            selectedCurve.maxima = GraphUtils.findTurnPts(selectedCurve.pts, 'maxima');
-            selectedCurve.minima = GraphUtils.findTurnPts(selectedCurve.pts, 'minima');
-            importantPoints.push(...selectedCurve.endPt);
-            importantPoints.push(...selectedCurve.maxima);
-            importantPoints.push(...selectedCurve.minima);
-            importantPoints.sort(function(a, b){return a[0] - b[0]});
+
+            const transposePoint = (pt: Point) => [pt[1], pt[0]];
+            const transposedSelectedCurvePts = selectedCurve.pts.map(transposePoint);
+            
+            const yMaxima = GraphUtils.findTurnPts(transposedSelectedCurvePts, 'maxima', selectedCurve.isClosed).map(transposePoint);
+            const yMinima = GraphUtils.findTurnPts(transposedSelectedCurvePts, 'minima', selectedCurve.isClosed).map(transposePoint);
+
+            importantPoints.push(...outermostPts, ...selectedCurve.maxima, ...selectedCurve.minima, ...yMinima, ...yMaxima);
+            // remove duplicates
+            importantPoints = importantPoints.filter((v, i) => importantPoints.findIndex((w) => _isEqual(v, w)) === i);
+            importantPoints.sort(GraphUtils.sortByPointOrder.bind(this, selectedCurve.pts));
 
             // maxima and minima are treated in slightly different ways
             if (isDefined(this.isMaxima)) {
@@ -910,11 +911,15 @@ export class GraphSketcher {
 
                 let pts: Point[] = [];
                 if (this.selectedLineType === LineType.BEZIER) {
+                    if (GraphUtils.getDist(this.drawnPts[0], this.drawnPts[this.drawnPts.length - 1]) < 15) {
+                        this.drawnPts.push(this.drawnPts[0]);
+                        curve.isClosed = true;
+                    }
                     pts = GraphUtils.bezierLineStyle(GraphUtils.sample(this.drawnPts));
                 } else if (this.selectedLineType === LineType.LINEAR) {
                     pts = GraphUtils.linearLineStyle([this.drawnPts[0],this.drawnPts[this.drawnPts.length-1]])
                 }
-
+              
                 GraphUtils.setCurveProperties(curve, pts, this.selectedLineType, this.canvasProperties, this.drawnColorIdx);
                 this._state.curves.push(curve);
                 this.reDraw();

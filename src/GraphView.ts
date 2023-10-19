@@ -55,10 +55,11 @@ export default class GraphView {
         curve.endPt = graphUtils.findEndPts(curve.pts);
         if (drawKnots) {   
             // draw x intercepts, y intercepts and turning points
-            this.drawKnots(curve['interX']);
-            this.drawKnots(curve['interY']);
-            this.drawKnots(curve['maxima']);
-            this.drawKnots(curve['minima']);
+            this.drawKnots(curve.interX]);
+            this.drawKnots(curve.interY]);
+            this.drawKnots(curve.maxima]);
+            this.drawKnots(curve.minima]);
+            this.drawKnots(curve.endPt);
         }
     }
 
