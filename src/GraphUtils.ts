@@ -146,8 +146,8 @@ export function detect(e: MouseEvent, x: number, y: number) {
 };
 
 export function getMousePt(e: any) {
-    let x = e.clientX + (e instanceof TouchEvent ? 5 : 0);
-    let y = e.clientY + (e instanceof TouchEvent ? 5 : 0);
+    let x = e.clientX + (window.TouchEvent && e instanceof TouchEvent ? 5 : 0);
+    let y = e.clientY + (window.TouchEvent && e instanceof TouchEvent ? 5 : 0);
     return createPoint(x, y);
 };
 
