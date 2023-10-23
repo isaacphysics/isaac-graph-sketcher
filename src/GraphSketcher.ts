@@ -81,6 +81,7 @@ export class GraphSketcher {
     private stretchMode?: string;
     private isMaxima?: boolean;
     private outOfBoundsCurvePoint?: Point;
+    private rotationCenter?: Point;
 
     // for moving symbols
     private movedSymbol?: null; // TODO: WTF is this?
@@ -534,6 +535,8 @@ export class GraphSketcher {
                 this.action = Action.ROTATE_CURVE;
                 this.clickedKnot = undefined;
                 this.prevMousePt = mousePosition;
+                this.rotationCenter = [(c.minX + c.maxX) / 2, (c.minY + c.maxY) / 2]
+
                 return;
             }
         }
@@ -638,12 +641,11 @@ export class GraphSketcher {
             GraphUtils.translateCurve(this._state.curves[this.movedCurveIdx], dx, dy, this.canvasProperties);
             this.outOfBoundsCurvePoint = this.isCurveOutsidePlot(this.movedCurveIdx) ? this.getAveragePoint(this._state.curves[this.movedCurveIdx].pts) : undefined;
             this.reDraw();
-        } else if (this.action === Action.ROTATE_CURVE && isDefined(this.clickedCurveIdx) && isDefined(this._state.curves)) {
+        } else if (this.action === Action.ROTATE_CURVE && isDefined(this.clickedCurveIdx) && isDefined(this._state.curves) && isDefined(this.rotationCenter)) {
             const curve = this._state.curves[this.clickedCurveIdx];
-            const curveCenter = [(curve.minX + curve.maxX) / 2, (curve.minY + curve.maxY) / 2]
-            const startingAngle = GraphUtils.getAngle(curveCenter, this.prevMousePt);
-            const currentAngle = GraphUtils.getAngle(curveCenter, mousePosition);
-            GraphUtils.rotateCurve(curve, currentAngle - startingAngle, curveCenter);
+            const startingAngle = GraphUtils.getAngle(this.rotationCenter, this.prevMousePt);
+            const currentAngle = GraphUtils.getAngle(this.rotationCenter, mousePosition);
+            GraphUtils.rotateCurve(curve, currentAngle - startingAngle, this.rotationCenter);
             this.prevMousePt = mousePosition;
             this.outOfBoundsCurvePoint = this.isCurveOutsidePlot(this.clickedCurveIdx) ? this.getAveragePoint(this._state.curves[this.clickedCurveIdx].pts) : undefined;
             if (this.hiddenKnotCurveIdxs.length === 0 || !this.hiddenKnotCurveIdxs.includes(this.clickedCurveIdx)) {
