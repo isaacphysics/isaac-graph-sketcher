@@ -42,7 +42,7 @@
     "lodash": "^4.17.21",
     "p5": "^1.5.0",
     "ts-loader": "^9.2.6",
-    "typescript": "*",
+    "typescript": "^4.9",
     "webpack": "^5.57.1",
     "webpack-cli": "^4.8.0",
     "webpack-dashboard": "^3.3.6",
