@@ -655,7 +655,6 @@ export class GraphSketcher {
                 this.hiddenKnotCurveIdxs.push(this.clickedCurveIdx);
             }
             this.reDraw();
-            // draw box while rotating:
             GraphUtils.setCurveProperties(curve, curve.pts, this.selectedLineType, this.canvasProperties, curve.colorIdx);
         } else if (this.action === Action.STRETCH_CURVE && isDefined(this.clickedCurveIdx) && isDefined(this._state.curves)) {
             this.p.cursor(this.p.MOVE);
@@ -723,28 +722,28 @@ export class GraphSketcher {
             // stretch the curve
             switch (this.stretchMode) {
                 case "bottomLeft":
-                    GraphUtils.stretchCurve(currentCurve, orx, ory, nrx, nry, currentCurve.maxX, currentCurve.maxY, this.canvasProperties);
+                    GraphUtils.stretchCurve(currentCurve, orx, ory, nrx, nry, currentCurve.maxX, currentCurve.maxY);
                     break;
                 case "bottomRight":
-                    GraphUtils.stretchCurve(currentCurve, orx, ory, nrx, nry, currentCurve.minX, currentCurve.maxY, this.canvasProperties);
+                    GraphUtils.stretchCurve(currentCurve, orx, ory, nrx, nry, currentCurve.minX, currentCurve.maxY);
                     break;
                 case "topRight":
-                    GraphUtils.stretchCurve(currentCurve, orx, ory, nrx, nry, currentCurve.minX, currentCurve.minY, this.canvasProperties);
+                    GraphUtils.stretchCurve(currentCurve, orx, ory, nrx, nry, currentCurve.minX, currentCurve.minY);
                     break;
                 case "topLeft":
-                    GraphUtils.stretchCurve(currentCurve, orx, ory, nrx, nry, currentCurve.maxX, currentCurve.minY, this.canvasProperties);
+                    GraphUtils.stretchCurve(currentCurve, orx, ory, nrx, nry, currentCurve.maxX, currentCurve.minY);
                     break;
                 case "bottomMiddle":
-                    GraphUtils.stretchCurve(currentCurve, orx, ory, orx, nry, (currentCurve.minX + currentCurve.maxX)/2, currentCurve.maxY, this.canvasProperties);
+                    GraphUtils.stretchCurve(currentCurve, orx, ory, orx, nry, (currentCurve.minX + currentCurve.maxX)/2, currentCurve.maxY);
                     break;
                 case "topMiddle":
-                    GraphUtils.stretchCurve(currentCurve, orx, ory, orx, nry, (currentCurve.minX + currentCurve.maxX)/2, currentCurve.minY, this.canvasProperties);
+                    GraphUtils.stretchCurve(currentCurve, orx, ory, orx, nry, (currentCurve.minX + currentCurve.maxX)/2, currentCurve.minY);
                     break;
                 case "leftMiddle":
-                    GraphUtils.stretchCurve(currentCurve, orx, ory, nrx, ory, currentCurve.maxX, (currentCurve.minY + currentCurve.maxY)/2, this.canvasProperties);
+                    GraphUtils.stretchCurve(currentCurve, orx, ory, nrx, ory, currentCurve.maxX, (currentCurve.minY + currentCurve.maxY)/2);
                     break;
                 case "rightMiddle":
-                    GraphUtils.stretchCurve(currentCurve, orx, ory, nrx, ory, currentCurve.minX, (currentCurve.minY + currentCurve.maxY)/2, this.canvasProperties);
+                    GraphUtils.stretchCurve(currentCurve, orx, ory, nrx, ory, currentCurve.minX, (currentCurve.minY + currentCurve.maxY)/2);
                     break;
             }
             this.outOfBoundsCurvePoint = this.isCurveOutsidePlot(this.clickedCurveIdx) ? this.getAveragePoint(this._state.curves[this.clickedCurveIdx].pts) : undefined;
@@ -810,20 +809,18 @@ export class GraphSketcher {
     };
 
     // Need to know where to update points to - gives final position
-    private mouseReleased = (_e: MouseEvent | TouchEvent | Touch) => {
+    private mouseReleased = (e: MouseEvent | Touch) => {
         if (this.previewMode) return;
 
-        if (_e instanceof MouseEvent) {
-            _e.preventDefault(); // Stops highlighting text on click and drag
+        if (e instanceof MouseEvent) {
+            e.preventDefault(); // Stops highlighting text on click and drag
         }
 
         const mousePosition = this.releasePt;
 
         // if it is just a click, handle click in the following if block
         if (!this.isMouseDragged) {
-            if ([Action.MOVE_CURVE, Action.STRETCH_CURVE, Action.STRETCH_POINT, Action.ROTATE_CURVE, Action.MOVE_SYMBOL].includes(this.action)) {
-                this.reDraw();
-            }
+            this.reDraw();
 
             // click do not respond in inactive area (eg buttons)
             if (!this.isActive(mousePosition)) {
@@ -1022,5 +1019,3 @@ export function makeGraphSketcher(element: HTMLElement | undefined | null, width
     }, element ?? undefined);
     return { sketch, p };
 }
-
-export * from './GraphView';

@@ -53,7 +53,7 @@ export default class GraphView {
         this.p.pop();
 
         if (drawKnots) {   
-            // draw x intercepts, y intercepts and turning points
+            // draw x intercepts, y intercepts, turning points, and end points
             this.drawKnots(curve.interX);
             this.drawKnots(curve.interY);
             this.drawKnots(curve.maxima);
@@ -183,24 +183,24 @@ export default class GraphView {
         this.p.push();
         this.p.stroke(this.DOT_LINE_COLOR);
         this.p.strokeWeight(0.5);
+        // draw box
         this.p.line(minX, minY, maxX, minY);
         this.p.line(maxX, minY, maxX, maxY);
         this.p.line(maxX, maxY, minX, maxY);
         this.p.line(minX, maxY, minX, minY);
 
         this.p.fill(255);
+        // stretch: corner squares
         this.p.rect(minX - 4, minY - 4, 8, 8);
         this.p.rect(maxX - 4, minY - 4, 8, 8);
         this.p.rect(minX - 4, maxY - 4, 8, 8);
         this.p.rect(maxX - 4, maxY - 4, 8, 8);
+        // stretch: side triangles
         this.p.triangle((minX + maxX)/2 - 5, minY - 2, (minX + maxX)/2 + 5, minY - 2, (minX + maxX)/2, minY - 7);
         this.p.triangle((minX + maxX)/2 - 5, maxY + 2, (minX + maxX)/2 + 5, maxY + 2, (minX + maxX)/2, maxY + 7);
         this.p.triangle(minX - 2, (minY + maxY) / 2 - 5, minX - 2, (minY + maxY) / 2 + 5, minX - 7, (minY + maxY) / 2);
         this.p.triangle(maxX + 2, (minY + maxY) / 2 - 5, maxX + 2, (minY + maxY) / 2 + 5, maxX + 7, (minY + maxY) / 2);
-        // this.p.arc(minX - 4, minY - 4, 29, 29, this.p.PI + 0.2, 3*this.p.HALF_PI - 0.2, this.p.OPEN);
-        // this.p.arc(minX - 4, minY - 4, 24, 24, this.p.PI + 0.2, 3*this.p.HALF_PI - 0.2, this.p.OPEN);
-        // this.p.triangle(minX - 8, minY - 20, minX - 8, minY - 12, minX - 4, minY - 16);
-        // this.p.triangle(minX - 20, minY - 8, minX - 16, minY - 4, minX - 12, minY - 8);
+        // rotate: corner diamonds
         this.makeDiamond(minX - 16, minY - 16, 4);
         this.makeDiamond(maxX + 16, minY - 16, 4);
         this.makeDiamond(minX - 16, maxY + 16, 4);
