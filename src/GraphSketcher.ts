@@ -42,11 +42,16 @@ enum Action {
     DRAW_CURVE,
     ROTATE_CURVE,
     MOVE_SYMBOL
-};
+}
 
-export enum LineType { BEZIER, LINEAR };
+export enum LineType { BEZIER, LINEAR }
 
-export interface GraphSketcherState { canvasWidth: number; canvasHeight: number; curves?: Curve[] };
+export interface GraphSketcherState { canvasWidth: number; canvasHeight: number; curves?: Curve[] }
+
+interface Checkpoint {
+    curvesJSON?: string;
+    clickedCurveIdx?: number;
+}
 
 export class GraphSketcher {
     private p: p5;
@@ -57,9 +62,9 @@ export class GraphSketcher {
     private allowMultiValuedFunctions: boolean = false;
     private showDebugInfo: boolean = false;
 
-    private checkPoint: any;
-    public  checkPointsUndo: any[] = [];
-    public  checkPointsRedo: any[] = [];
+    private checkPoint: Checkpoint = {};
+    public  checkPointsUndo: Checkpoint[] = [];
+    public  checkPointsRedo: Checkpoint[] = [];
 
     private CURVE_LIMIT = 3;
     private MOUSE_DETECT_RADIUS = 20;
@@ -85,7 +90,6 @@ export class GraphSketcher {
 
     // for moving symbols
     private movedSymbol?: null; // TODO: WTF is this?
-    private bindedKnot?: { [x: string]: any; };
     private symbolType?: string;
 
     private _oldState: GraphSketcherState;
@@ -179,7 +183,7 @@ export class GraphSketcher {
         this.canvas = this.p.createCanvas(this.canvasProperties.widthPx, this.canvasProperties.heightPx);
         this.reDraw();
         this.setupDone = true;
-    }
+    };
 
     public teardown = () => {
         this.p.touchStarted = () => {};
@@ -197,7 +201,7 @@ export class GraphSketcher {
 
         this.trashButton?.removeEventListener('click', this.deleteSelectedCurve);
         this.resetButton?.removeEventListener('click', this.deleteAllCurves);
-    }
+    };
 
     private static getCanvasPropertiesForResolution(width: number, height: number): CanvasProperties {
         return {
@@ -209,7 +213,7 @@ export class GraphSketcher {
             // The canvas-space start and end of the drawable area (top left and bottom right of cartesian plot)
             plotStartPx: [width / 2 - Math.min(width, height) / 2, height / 2 - Math.min(width, height) / 2],
             plotEndPx: [width / 2 + Math.min(width, height) / 2, height / 2 + Math.min(width, height) / 2]
-        }
+        };
     }
 
     private deleteSelectedCurve = () => {
@@ -224,7 +228,7 @@ export class GraphSketcher {
             this.clickedCurveIdx = undefined;
             this.reDraw();
         }
-    }
+    };
 
     private deleteAllCurves = () => {
         if (isDefined(this._state.curves)) {
@@ -239,30 +243,30 @@ export class GraphSketcher {
             this.clickedCurveIdx = undefined;
             this.reDraw();
         }
-    }
+    };
 
     private isPointOverButton = (pt: Point, button: HTMLElement) => {
         const rect = button.getBoundingClientRect();
         if (rect) {
-            let left = rect.left;
-            let top = rect.top;
-            let width = rect.width;
-            let height = rect.height;
+            const left = rect.left;
+            const top = rect.top;
+            const width = rect.width;
+            const height = rect.height;
             return pt[0] > left && pt[0] < left + width && pt[1] > top && pt[1] < top + height;
         }
         return false;
-    }
+    };
 
     private isPointInsidePlot = (pt: Point) => {
         return pt[0] > this.canvasProperties.plotStartPx[0]
             && pt[0] < this.canvasProperties.plotEndPx[0]
             && pt[1] > this.canvasProperties.plotStartPx[1]
-            && pt[1] < this.canvasProperties.plotEndPx[1]
-    }
+            && pt[1] < this.canvasProperties.plotEndPx[1];
+    };
 
     private areMostPointsOutsidePlot = (pts: Point[]) => {
         return pts.filter(this.isPointInsidePlot).length < (pts.length * this.REQUIRED_CURVE_ON_SCREEN_RATIO);
-    }
+    };
 
     private isCurveOutsidePlot = (curveIdx: number) => {
         if (!isDefined(this._state.curves)) {
@@ -273,7 +277,7 @@ export class GraphSketcher {
         const curve = this._state.curves[curveIdx];
         const points = GraphUtils.sample(curve.pts);
         return this.areMostPointsOutsidePlot(points);
-    }
+    };
 
     private getAveragePoint = (pts: Point[]): Point => {
         // Calculate the average point
@@ -286,7 +290,7 @@ export class GraphSketcher {
         avgX /= pts.length;
         avgY /= pts.length;
         return [avgX, avgY];
-    }
+    };
 
     // Mouse is inactive if over buttons - stops curves being drawn where they can't be seen
     private isActive = (pt: Point) => {
@@ -296,7 +300,7 @@ export class GraphSketcher {
             }
         }
         return true;
-    }
+    };
 
     // undo-ing, record history
     public undo = () => {
@@ -304,17 +308,17 @@ export class GraphSketcher {
             return;
         }
 
-        let checkPointRedo: { curvesJSON?: string } = {};
+        const checkPointRedo: { curvesJSON?: string } = {};
         checkPointRedo.curvesJSON = JSON.stringify(this._state);
         this.checkPointsRedo.push(checkPointRedo);
 
-        let checkPointUndo = this.checkPointsUndo.pop();
-        this._state = JSON.parse(checkPointUndo.curvesJSON);
+        const checkPointUndo = this.checkPointsUndo.pop();
+        this._state = JSON.parse(checkPointUndo?.curvesJSON ?? "");
         this.clickedKnot = undefined;
         this.clickedCurveIdx = undefined;
 
         this.reDraw();
-    }
+    };
 
     // redo-ing, record history
     public redo = () => {
@@ -322,37 +326,37 @@ export class GraphSketcher {
             return;
         }
 
-        let checkPointUndo: { curvesJSON?: string } = {};
+        const checkPointUndo: { curvesJSON?: string } = {};
         checkPointUndo.curvesJSON = JSON.stringify(this._state);
         this.checkPointsUndo.push(checkPointUndo);
 
-        let checkPointRedo = this.checkPointsRedo.pop();
-        this._state = JSON.parse(checkPointRedo.curvesJSON);
+        const checkPointRedo = this.checkPointsRedo.pop();
+        this._state = JSON.parse(checkPointRedo?.curvesJSON ?? "");
 
         this.clickedKnot = undefined;
         this.clickedCurveIdx = undefined;
 
         this.reDraw();
-    }
+    };
 
     // Check if undo/redo should be made available, if so the respective option will be shown
     public isUndoable = () => {
         return this.checkPointsUndo.length > 0;
-    }
+    };
 
     public isRedoable = () => {
         return this.checkPointsRedo.length > 0;
-    }
+    };
 
     // Check if movement to new position is over an actionable object, so can render appropriately
     private mouseMoved = (e: MouseEvent) => {
         if (this.previewMode) return;
 
-        let mousePosition: Point = GraphUtils.getMousePt(e);
+        const mousePosition: Point = GraphUtils.getMousePt(e);
 
         const detect = (x: number, y: number) => {
             return (Math.abs(mousePosition[0] - x) < this.MOUSE_DETECT_RADIUS && Math.abs(mousePosition[1] - y) < this.MOUSE_DETECT_RADIUS);
-        }
+        };
 
         // this function does not react if the mouse is over buttons or outside the canvas.
         if (!this.isActive(mousePosition)) {
@@ -360,7 +364,7 @@ export class GraphSketcher {
         }
 
         if (isDefined(this._state.curves)) {
-            let found = GraphUtils.overItem(this._state.curves, e, this.MOUSE_DETECT_RADIUS, "notFound");
+            const found = GraphUtils.overItem(this._state.curves, e, this.MOUSE_DETECT_RADIUS, "notFound");
             if (found === "overKnot") {
                 this.p.cursor(this.p.HAND);
                 return;
@@ -380,11 +384,11 @@ export class GraphSketcher {
             this.p.rotate(this.p.QUARTER_PI);
             this.p.square(0, 0, w);
             this.p.pop();
-        }
+        };
 
         // stretch box
         if (isDefined(this.clickedCurveIdx) && isDefined(this._state.curves)) {
-            let c = this._state.curves[this.clickedCurveIdx];
+            const c = this._state.curves[this.clickedCurveIdx];
             let isDraggable = false;
             if (detect(c.minX, c.minY) || detect(c.maxX, c.minY) || detect(c.minX, c.maxY) || detect(c.maxX, c.maxY)) {
                 isDraggable = true;
@@ -439,10 +443,10 @@ export class GraphSketcher {
                 this.graphView.drawStretchBox(this.clickedCurveIdx, this._state.curves);
             }
         }
-    }
+    };
 
     // Determines type of action when clicking on something within the canvas
-    private mousePressed = (e: MouseEvent | TouchEvent | Touch) => {
+    private mousePressed = (e: MouseEvent | Touch) => {
         if (this.previewMode) return;
 
         if (e instanceof MouseEvent) {
@@ -453,7 +457,6 @@ export class GraphSketcher {
         this.action = Action.NO_ACTION;
 
         this.movedSymbol = undefined;
-        this.bindedKnot = undefined;
         this.symbolType = undefined;
 
         this.drawnPts = [];
@@ -477,7 +480,7 @@ export class GraphSketcher {
         this.prevMousePt = [0,0];
         this.outOfBoundsCurvePoint = undefined;
 
-        let mousePosition = GraphUtils.getMousePt(e);
+        const mousePosition = GraphUtils.getMousePt(e);
         this.releasePt = mousePosition;
 
         // this function does not react if the mouse is over buttons or outside the canvas.
@@ -486,19 +489,19 @@ export class GraphSketcher {
         }
 
         if (this.showDebugInfo) {
-            this.graphView.debugDrawCoordinates(mousePosition)
+            this.graphView.debugDrawCoordinates(mousePosition);
         }
 
         const detect = (x: number, y: number) => {
             return (Math.abs(mousePosition[0] - x) < this.MOUSE_DETECT_RADIUS && Math.abs(mousePosition[1] - y) < this.MOUSE_DETECT_RADIUS);
-        }
+        };
         // record down mousePosition status, may be used later for undo.
         this.checkPoint = {};
         this.checkPoint.curvesJSON = JSON.stringify(this._state);
 
         // check if stretching curve
         if (isDefined(this.clickedCurveIdx) && isDefined(this._state.curves)) {
-            let c = this._state.curves[this.clickedCurveIdx];
+            const c = this._state.curves[this.clickedCurveIdx];
 
             if (detect(c.minX, c.minY) || detect(c.maxX, c.minY) || detect(c.minX, c.maxY) || detect(c.maxX, c.maxY) ||
                 detect((c.minX + c.maxX)/2, c.minY - 3) || detect((c.minX + c.maxX)/2, c.maxY + 3) ||
@@ -535,7 +538,7 @@ export class GraphSketcher {
                 this.action = Action.ROTATE_CURVE;
                 this.clickedKnot = undefined;
                 this.prevMousePt = mousePosition;
-                this.rotationCenter = [(c.minX + c.maxX) / 2, (c.minY + c.maxY) / 2]
+                this.rotationCenter = [(c.minX + c.maxX) / 2, (c.minY + c.maxY) / 2];
 
                 return;
             }
@@ -543,13 +546,13 @@ export class GraphSketcher {
 
         if (isDefined(this._state.curves) && this._state.curves.length > 0) {
             for (let i = 0; i < this._state.curves.length; i++) {
-                let maxima = this._state.curves[i].maxima;
-                let minima = this._state.curves[i].minima;
-                let draggablePoints = minima.concat(maxima, GraphUtils.findEndPts(this._state.curves[i].pts));
+                const maxima = this._state.curves[i].maxima;
+                const minima = this._state.curves[i].minima;
+                const draggablePoints = minima.concat(maxima, GraphUtils.findEndPts(this._state.curves[i].pts));
                 draggablePoints.sort(GraphUtils.sortByPointOrder.bind(this, this._state.curves[i].pts));
 
                 for (let j = 0; j < draggablePoints.length; j++) {
-                    let knot = draggablePoints[j];
+                    const knot = draggablePoints[j];
                     if (GraphUtils.getDist(mousePosition, knot) < this.MOUSE_DETECT_RADIUS + 10) {
                         this.clickedCurve = i;
                         this.action = Action.STRETCH_POINT;
@@ -585,10 +588,10 @@ export class GraphSketcher {
             this.clickedKnot = undefined;
             this.reDraw();
         }
-    }
+    };
 
     // Keep actions for curve manipulation together
-    private mouseDragged = (e: MouseEvent | TouchEvent | Touch) => {
+    private mouseDragged = (e: MouseEvent | Touch) => {
         if (this.previewMode) return;
 
         if (e instanceof MouseEvent) {
@@ -596,11 +599,11 @@ export class GraphSketcher {
         }
 
         this.isMouseDragged = true;
-        let mousePosition = GraphUtils.getMousePt(e);
+        const mousePosition = GraphUtils.getMousePt(e);
         this.releasePt = mousePosition;
 
         if (this.action === Action.STRETCH_POINT && isDefined(this.clickedCurve) && isDefined(this._state.curves)) {
-            let selectedCurve = this._state.curves[this.clickedCurve];
+            const selectedCurve = this._state.curves[this.clickedCurve];
             // we need to know the (important) ordered end and turning points
             let importantPoints: Point[] = [];
             selectedCurve.maxima = GraphUtils.findTurnPts(selectedCurve.pts, 'maxima', selectedCurve.isClosed);
@@ -635,8 +638,8 @@ export class GraphSketcher {
         } else if (this.action === Action.MOVE_CURVE && isDefined(this.movedCurveIdx) && isDefined(this._state.curves)) {
             this.p.cursor(this.p.MOVE);
 
-            let dx = mousePosition[0] - this.prevMousePt[0];
-            let dy = mousePosition[1] - this.prevMousePt[1];
+            const dx = mousePosition[0] - this.prevMousePt[0];
+            const dy = mousePosition[1] - this.prevMousePt[1];
             this.prevMousePt = mousePosition;
             GraphUtils.translateCurve(this._state.curves[this.movedCurveIdx], dx, dy, this.canvasProperties);
             this.outOfBoundsCurvePoint = this.isCurveOutsidePlot(this.movedCurveIdx) ? this.getAveragePoint(this._state.curves[this.movedCurveIdx].pts) : undefined;
@@ -657,15 +660,15 @@ export class GraphSketcher {
         } else if (this.action === Action.STRETCH_CURVE && isDefined(this.clickedCurveIdx) && isDefined(this._state.curves)) {
             this.p.cursor(this.p.MOVE);
 
-            let dx = mousePosition[0] - this.prevMousePt[0];
-            let dy = mousePosition[1] - this.prevMousePt[1];
+            const dx = mousePosition[0] - this.prevMousePt[0];
+            const dy = mousePosition[1] - this.prevMousePt[1];
             this.prevMousePt = mousePosition;
 
-            let currentCurve = this._state.curves[this.clickedCurveIdx];
+            const currentCurve = this._state.curves[this.clickedCurveIdx];
 
             // calculate old x,y range
-            let orx = currentCurve.maxX - currentCurve.minX;
-            let ory = currentCurve.maxY - currentCurve.minY;
+            const orx = currentCurve.maxX - currentCurve.minX;
+            const ory = currentCurve.maxY - currentCurve.minY;
 
             this.graphView.drawCorner(this.stretchMode || "none", currentCurve);
 
@@ -714,8 +717,8 @@ export class GraphSketcher {
             }
 
             // calculate the new range
-            let nrx = currentCurve.maxX - currentCurve.minX;
-            let nry = currentCurve.maxY - currentCurve.minY;
+            const nrx = currentCurve.maxX - currentCurve.minX;
+            const nry = currentCurve.maxY - currentCurve.minY;
 
             // stretch the curve
             switch (this.stretchMode) {
@@ -804,7 +807,7 @@ export class GraphSketcher {
 
             }
         }
-    }
+    };
 
     // Need to know where to update points to - gives final position
     private mouseReleased = (_e: MouseEvent | TouchEvent | Touch) => {
@@ -814,20 +817,11 @@ export class GraphSketcher {
             _e.preventDefault(); // Stops highlighting text on click and drag
         }
 
-        let mousePosition = this.releasePt;
+        const mousePosition = this.releasePt;
 
         // if it is just a click, handle click in the following if block
         if (!this.isMouseDragged) {
-            // clean up the mess of MOVE_SYMBOL and MOVE_CURVE
-            if (this.action === Action.MOVE_SYMBOL) {
-                // TODO: This does not seem to do anything useful
-                if (!this.bindedKnot) {
-                    // this.freeSymbols.push(this.movedSymbol);
-                } else {
-                    this.bindedKnot[this.symbolType || ''] = this.movedSymbol;
-                }
-                this.reDraw();
-            } else if ([Action.MOVE_CURVE, Action.STRETCH_CURVE, Action.STRETCH_POINT, Action.ROTATE_CURVE].includes(this.action)) {
+            if ([Action.MOVE_CURVE, Action.STRETCH_CURVE, Action.STRETCH_POINT, Action.ROTATE_CURVE, Action.MOVE_SYMBOL].includes(this.action)) {
                 this.reDraw();
             }
 
@@ -839,7 +833,7 @@ export class GraphSketcher {
             // check if show stretch box
             if (isDefined(this._state.curves)) {
                 for (let i = 0; i < this._state.curves.length; i++) {
-                    let pts = this._state.curves[i].pts;
+                    const pts = this._state.curves[i].pts;
                     for (let j = 0; j < pts.length; j++) {
                         if (GraphUtils.getDist(pts[j], mousePosition) < this.MOUSE_DETECT_RADIUS) {
                             this.clickedCurveIdx = i;
@@ -889,7 +883,7 @@ export class GraphSketcher {
                     // If the curve is too short or mostly outside the plot, don't add it
                     return;
                 }
-                let curve = new Curve();
+                const curve = new Curve();
 
                 this.checkPointsUndo.push(this.checkPoint);
                 this.checkPointsRedo = [];
@@ -917,7 +911,7 @@ export class GraphSketcher {
                     }
                     pts = GraphUtils.bezierLineStyle(GraphUtils.sample(this.drawnPts));
                 } else if (this.selectedLineType === LineType.LINEAR) {
-                    pts = GraphUtils.linearLineStyle([this.drawnPts[0],this.drawnPts[this.drawnPts.length-1]])
+                    pts = GraphUtils.linearLineStyle([this.drawnPts[0],this.drawnPts[this.drawnPts.length-1]]);
                 }
               
                 GraphUtils.setCurveProperties(curve, pts, this.selectedLineType, this.canvasProperties, this.drawnColorIdx);
@@ -936,38 +930,38 @@ export class GraphSketcher {
                 this.reDraw();
             }
         }
-    }
+    };
 
     // Would like to be used on touch screen devices, this simply facilitates it
     private touchStarted = (e: TouchEvent) => {
         if (this.previewMode) return;
         //e.preventDefault(); // Ideally we want this, but it breaks interaction with the rest of the sketcher UI for some reason... commented out for now
         this.p.mousePressed(e.touches[0]);
-    }
+    };
 
     private touchMoved = (e: TouchEvent) => {
         if (this.previewMode) return;
         //e.preventDefault();
         this.p.mouseDragged(e.touches[0]);
-    }
+    };
 
     private touchEnded = (e: TouchEvent) => {
         if (this.previewMode) return;
         //e.preventDefault();
         this.p.mouseReleased(e);
-    }
+    };
 
     public windowResized = () => {
         const data = GraphUtils.encodeData(false, this.canvasProperties, this._state.curves || []);
         if (!this.previewMode) {
-            this.canvasProperties = GraphSketcher.getCanvasPropertiesForResolution(window.innerWidth, window.innerHeight)
+            this.canvasProperties = GraphSketcher.getCanvasPropertiesForResolution(window.innerWidth, window.innerHeight);
             this.p.resizeCanvas(window.innerWidth, window.innerHeight, true);
         }
         if (isDefined(data)) {
             this._state = GraphUtils.decodeData(data, this.canvasProperties);
         }
         this.reDraw();
-    }
+    };
 
     private keyReleased = () => {
         if (this.p.key === "Delete" || this.p.key === "Backspace") {
@@ -979,7 +973,7 @@ export class GraphSketcher {
                 this.reDraw();
             }
         }
-    }
+    };
 
     // Kind of hacky, and tightly coupled to isaac-react-app, but it seems to be the only way to get the external UI
     // to update nicely with canvas events, without having to pass in a bunch of callbacks or polling
@@ -990,7 +984,7 @@ export class GraphSketcher {
         if (isDefined(this.resetButton)) {
             this.resetButton.disabled = this._state.curves === undefined || this._state.curves.length === 0;
         }
-    }
+    };
 
     // equivalent to 'locally' refreshing the canvas
     public reDraw = () => {
@@ -1022,7 +1016,7 @@ export class GraphSketcher {
 
 export function makeGraphSketcher(element: HTMLElement | undefined | null, width: number, height: number, options: { previewMode: boolean, initialCurves?: Curve[], allowMultiValuedFunctions?: boolean } = { previewMode: false, allowMultiValuedFunctions: false }): { sketch?: GraphSketcher, p: p5 } {
     let sketch: GraphSketcher | undefined;
-    let p = new p5(instance => {
+    const p = new p5(instance => {
         sketch = new GraphSketcher(instance, width, height, options);
         return sketch;
     }, element ?? undefined);
