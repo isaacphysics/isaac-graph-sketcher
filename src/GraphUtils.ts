@@ -1,4 +1,4 @@
-import {CanvasProperties, Curve, Dimension, GraphSketcherState, LineType, Point} from "./GraphSketcher";
+import {CanvasProperties, Curve, Dimension, GraphSketcher, GraphSketcherState, Point} from "./GraphSketcher";
 import _isEqual from 'lodash/isEqual';
 
 // undefined|null checker and type guard all-in-wonder.
@@ -153,35 +153,17 @@ export function createPoint(x: number, y: number) {
     return obj;
 }
 
-export function setCurveProperties(curve: Curve, pts: Point[], selectedLineType: LineType, canvasProperties: CanvasProperties, colorIdx: number) {
-    curve.pts = pts;
+export function recalculateCurveProperties(curve: Curve, canvasProperties: CanvasProperties) {
+    // note: this does not set ALL properties, only those that might reasonably change when the curve is modified
+    curve.minX = curve.pts.reduce((min, p) => Math.min(min, p[0]), curve.pts[0][0]);
+    curve.maxX = curve.pts.reduce((max, p) => Math.max(max, p[0]), curve.pts[0][0]);
+    curve.minY = curve.pts.reduce((min, p) => Math.min(min, p[1]), curve.pts[0][1]);
+    curve.maxY = curve.pts.reduce((max, p) => Math.max(max, p[1]), curve.pts[0][1]);
 
-    let minX = pts[0][0];
-    let maxX = pts[0][0];
-    let minY = pts[0][1];
-    let maxY = pts[0][1];
-    for (let i = 1; i < pts.length; i++) {
-        minX = Math.min(pts[i][0], minX);
-        maxX = Math.max(pts[i][0], maxX);
-        minY = Math.min(pts[i][1], minY);
-        maxY = Math.max(pts[i][1], maxY);
-    }
-    curve.minX = minX;
-    curve.maxX = maxX;
-    curve.minY = minY;
-    curve.maxY = maxY;
-
-    curve.interX = findInterceptX(canvasProperties, pts);
-    curve.interY = findInterceptY(canvasProperties, pts);
-    if (selectedLineType === LineType.BEZIER) {
-        curve.maxima = findTurnPts(pts, 'maxima');
-        curve.minima = findTurnPts(pts, 'minima');
-    } else {
-        curve.maxima = [];
-        curve.minima = [];
-    }
-    curve.colorIdx = colorIdx;
-}
+    curve.interX = findInterceptX(canvasProperties, curve.pts);
+    curve.interY = findInterceptY(canvasProperties, curve.pts);
+    curve.maxima = findTurnPts(curve.pts, 'maxima');
+    curve.minima = findTurnPts(curve.pts, 'minima');}
 
 export function linearLineStyle(pts: Point[]) {
     pts.sort(function(a, b){return a[0] - b[0];});
@@ -444,6 +426,39 @@ export function findTurnPts(pts: Point[], mode: string, isClosed: boolean = fals
     return turnPts;
 }
 
+// importantPoints is a list of all points that will not move when any other important point is stretched.
+// This includes the outermost points, the maxima and minima (for x and y), and the endpoints.
+// If two important points are close together, they will be treated as one, with priority going to endpoints, then x-min/x-max, then outermost, then y-min/y-max.
+export function findImportantPoints(curve: Curve) {
+    const transposePoint = (pt: Point) => [pt[1], pt[0]];
+    const transposedSelectedCurvePts = curve.pts.map(transposePoint);
+    
+    const yMaxima = findTurnPts(transposedSelectedCurvePts, 'maxima', curve.isClosed).map(transposePoint);
+    const yMinima = findTurnPts(transposedSelectedCurvePts, 'minima', curve.isClosed).map(transposePoint);
+    const outermostPts = findOutermostPts(curve.pts);
+
+    const endPoints: Point[] = (!curve.isClosed ? findEndPts(curve.pts) : []);
+
+    // push all points from pts into arr that are not within GraphSketcher.IMPORTANT_POINT_DETECT_RADIUS of any point in arr
+    const pushWithDistanceCheck = (arr: Point[], pts: Point[]) => {
+        pts.forEach((pt) => {if (arr.every((v) => getDist(v, pt) > GraphSketcher.IMPORTANT_POINT_DETECT_RADIUS)) {
+            arr.push(pt);
+        }});
+    };
+
+    let importantPoints : Point[] = [];
+
+    for (const ptsList of [endPoints, curve.maxima, curve.minima, yMinima, yMaxima, outermostPts]) {
+        pushWithDistanceCheck(importantPoints, ptsList);
+    }
+
+    // remove duplicates
+    importantPoints = importantPoints.filter((v, i) => importantPoints.findIndex((w) => _isEqual(v, w)) === i);
+    importantPoints.sort(sortByPointOrder.bind(undefined, curve.pts));
+
+    return importantPoints;
+}
+
 
 // given a curve, translate the curve
 export function translateCurve(curve: Curve, dx: number, dy: number, canvasProperties: CanvasProperties) {
@@ -658,7 +673,7 @@ export function stretchTurningPoint(importantPoints: Point[], e: MouseEvent | To
         selectedCurve.pts.push(...rightStretchedCurve.pts);
         selectedCurve.pts.push(...rightStaticPoints);
 
-        setCurveProperties(selectedCurve, selectedCurve.pts, LineType.BEZIER, canvasProperties, selectedCurve.colorIdx);
+        recalculateCurveProperties(selectedCurve, canvasProperties);
     }
     return selectedCurve;
 }

@@ -66,9 +66,10 @@ export class GraphSketcher {
     public  checkPointsUndo: Checkpoint[] = [];
     public  checkPointsRedo: Checkpoint[] = [];
 
-    private CURVE_LIMIT = 3;
-    private MOUSE_DETECT_RADIUS = 20;
-    private REQUIRED_CURVE_ON_SCREEN_RATIO = 0.50; // 50% of a curves points must be on screen or it will be deleted
+    public static CURVE_LIMIT = 3;
+    public static MOUSE_DETECT_RADIUS = 20;
+    public static IMPORTANT_POINT_DETECT_RADIUS = 30;
+    public static REQUIRED_CURVE_ON_SCREEN_RATIO = 0.50; // 50% of a curves points must be on screen or it will be deleted
 
     // action recorder
     private action: Action = Action.NO_ACTION;
@@ -265,7 +266,7 @@ export class GraphSketcher {
     };
 
     private areMostPointsOutsidePlot = (pts: Point[]) => {
-        return pts.filter(this.isPointInsidePlot).length < (pts.length * this.REQUIRED_CURVE_ON_SCREEN_RATIO);
+        return pts.filter(this.isPointInsidePlot).length < (pts.length * GraphSketcher.REQUIRED_CURVE_ON_SCREEN_RATIO);
     };
 
     private isCurveOutsidePlot = (curveIdx: number) => {
@@ -355,7 +356,7 @@ export class GraphSketcher {
         const mousePosition: Point = GraphUtils.getMousePt(e);
 
         const detect = (x: number, y: number) => {
-            return (Math.abs(mousePosition[0] - x) < this.MOUSE_DETECT_RADIUS && Math.abs(mousePosition[1] - y) < this.MOUSE_DETECT_RADIUS);
+            return (Math.abs(mousePosition[0] - x) < GraphSketcher.MOUSE_DETECT_RADIUS && Math.abs(mousePosition[1] - y) < GraphSketcher.MOUSE_DETECT_RADIUS);
         };
 
         // this function does not react if the mouse is over buttons or outside the canvas.
@@ -364,7 +365,7 @@ export class GraphSketcher {
         }
 
         if (isDefined(this._state.curves)) {
-            const found = GraphUtils.overItem(this._state.curves, e, this.MOUSE_DETECT_RADIUS, "notFound");
+            const found = GraphUtils.overItem(this._state.curves, e, GraphSketcher.MOUSE_DETECT_RADIUS, "notFound");
             if (found === "overKnot") {
                 this.p.cursor(this.p.HAND);
                 return;
@@ -493,7 +494,7 @@ export class GraphSketcher {
         }
 
         const detect = (x: number, y: number) => {
-            return (Math.abs(mousePosition[0] - x) < this.MOUSE_DETECT_RADIUS && Math.abs(mousePosition[1] - y) < this.MOUSE_DETECT_RADIUS);
+            return (Math.abs(mousePosition[0] - x) < GraphSketcher.MOUSE_DETECT_RADIUS && Math.abs(mousePosition[1] - y) < GraphSketcher.MOUSE_DETECT_RADIUS);
         };
         // record down mousePosition status, may be used later for undo.
         this.checkPoint = {};
@@ -553,7 +554,7 @@ export class GraphSketcher {
 
                 for (let j = 0; j < draggablePoints.length; j++) {
                     const knot = draggablePoints[j];
-                    if (GraphUtils.getDist(mousePosition, knot) < this.MOUSE_DETECT_RADIUS + 10) {
+                    if (GraphUtils.getDist(mousePosition, knot) < GraphSketcher.MOUSE_DETECT_RADIUS + 10) {
                         this.clickedCurve = i;
                         this.action = Action.STRETCH_POINT;
                         this.clickedKnotId = j;
@@ -565,7 +566,7 @@ export class GraphSketcher {
             }
             for (let i = 0; i < this._state.curves.length; i++) {
                 for (let j = 0; j < this._state.curves[i].pts.length; j++) {
-                    if (GraphUtils.getDist(mousePosition, this._state.curves[i].pts[j]) < this.MOUSE_DETECT_RADIUS * 2) {
+                    if (GraphUtils.getDist(mousePosition, this._state.curves[i].pts[j]) < GraphSketcher.MOUSE_DETECT_RADIUS * 2) {
                         this.clickedCurveIdx = i;
                         this.movedCurveIdx = i;
                         this.action = Action.MOVE_CURVE;
@@ -578,7 +579,7 @@ export class GraphSketcher {
         }
 
         // Does another check to make sure the mouse is inside the plot, and not just "active"
-        if (isDefined(this._state.curves) && this.isPointInsidePlot(mousePosition) && this._state.curves.length < this.CURVE_LIMIT){
+        if (isDefined(this._state.curves) && this.isPointInsidePlot(mousePosition) && this._state.curves.length < GraphSketcher.CURVE_LIMIT){
             this.action = Action.DRAW_CURVE;
         }
 
@@ -604,25 +605,8 @@ export class GraphSketcher {
 
         if (this.action === Action.STRETCH_POINT && isDefined(this.clickedCurve) && isDefined(this._state.curves)) {
             const selectedCurve = this._state.curves[this.clickedCurve];
-            // we need to know the (important) ordered end and turning points
-            let importantPoints: Point[] = [];
-            selectedCurve.maxima = GraphUtils.findTurnPts(selectedCurve.pts, 'maxima', selectedCurve.isClosed);
-            selectedCurve.minima = GraphUtils.findTurnPts(selectedCurve.pts, 'minima', selectedCurve.isClosed);
-            const outermostPts = GraphUtils.findOutermostPts(selectedCurve.pts);
-            if (!selectedCurve.isClosed) {
-                importantPoints.push(...GraphUtils.findEndPts(selectedCurve.pts));
-            }
-
-            const transposePoint = (pt: Point) => [pt[1], pt[0]];
-            const transposedSelectedCurvePts = selectedCurve.pts.map(transposePoint);
             
-            const yMaxima = GraphUtils.findTurnPts(transposedSelectedCurvePts, 'maxima', selectedCurve.isClosed).map(transposePoint);
-            const yMinima = GraphUtils.findTurnPts(transposedSelectedCurvePts, 'minima', selectedCurve.isClosed).map(transposePoint);
-
-            importantPoints.push(...outermostPts, ...selectedCurve.maxima, ...selectedCurve.minima, ...yMinima, ...yMaxima);
-            // remove duplicates
-            importantPoints = importantPoints.filter((v, i) => importantPoints.findIndex((w) => _isEqual(v, w)) === i);
-            importantPoints.sort(GraphUtils.sortByPointOrder.bind(this, selectedCurve.pts));
+            const importantPoints = GraphUtils.findImportantPoints(selectedCurve);
 
             // maxima and minima are treated in slightly different ways
             if (isDefined(this.isMaxima)) {
@@ -655,7 +639,7 @@ export class GraphSketcher {
                 this.hiddenKnotCurveIdxs.push(this.clickedCurveIdx);
             }
             this.reDraw();
-            GraphUtils.setCurveProperties(curve, curve.pts, this.selectedLineType, this.canvasProperties, curve.colorIdx);
+            GraphUtils.recalculateCurveProperties(curve, this.canvasProperties);
         } else if (this.action === Action.STRETCH_CURVE && isDefined(this.clickedCurveIdx) && isDefined(this._state.curves)) {
             this.p.cursor(this.p.MOVE);
 
@@ -752,7 +736,7 @@ export class GraphSketcher {
 
         } else if (this.action === Action.DRAW_CURVE && this.drawnColorIdx >= 0) {
             this.p.cursor(this.p.CROSS);
-            if (isDefined(this._state.curves) && this._state.curves.length < this.CURVE_LIMIT) {
+            if (isDefined(this._state.curves) && this._state.curves.length < GraphSketcher.CURVE_LIMIT) {
 
                 // Constrain mouse x position based on x-direction of line between last two points - this block is
                 // the only thing that enforces this, so will be easy to remove if it's not wanted (see `git blame`
@@ -832,7 +816,7 @@ export class GraphSketcher {
                 for (let i = 0; i < this._state.curves.length; i++) {
                     const pts = this._state.curves[i].pts;
                     for (let j = 0; j < pts.length; j++) {
-                        if (GraphUtils.getDist(pts[j], mousePosition) < this.MOUSE_DETECT_RADIUS) {
+                        if (GraphUtils.getDist(pts[j], mousePosition) < GraphSketcher.MOUSE_DETECT_RADIUS) {
                             this.clickedCurveIdx = i;
                             this.reDraw();
                             return;
@@ -874,7 +858,7 @@ export class GraphSketcher {
             }
         } else if (this.action === Action.DRAW_CURVE) {
 
-            if (isDefined(this._state.curves) && this._state.curves.length < this.CURVE_LIMIT){
+            if (isDefined(this._state.curves) && this._state.curves.length < GraphSketcher.CURVE_LIMIT){
 
                 if (this.drawnPts.length < 3 && this.selectedLineType !== LineType.LINEAR) {
                     // If the curve is too short or mostly outside the plot, don't add it
@@ -910,8 +894,10 @@ export class GraphSketcher {
                 } else if (this.selectedLineType === LineType.LINEAR) {
                     pts = GraphUtils.linearLineStyle([this.drawnPts[0],this.drawnPts[this.drawnPts.length-1]]);
                 }
-              
-                GraphUtils.setCurveProperties(curve, pts, this.selectedLineType, this.canvasProperties, this.drawnColorIdx);
+
+                curve.pts = pts;
+                curve.colorIdx = this.drawnColorIdx;
+                GraphUtils.recalculateCurveProperties(curve, this.canvasProperties);
                 this._state.curves.push(curve);
                 this.reDraw();
             }
@@ -923,7 +909,7 @@ export class GraphSketcher {
                 this.checkPointsRedo = [];
                 this.hiddenKnotCurveIdxs.pop();
 
-                GraphUtils.setCurveProperties(this._state.curves[this.clickedCurveIdx], this._state.curves[this.clickedCurveIdx].pts, this.selectedLineType, this.canvasProperties, this._state.curves[this.clickedCurveIdx].colorIdx);
+                GraphUtils.recalculateCurveProperties(this._state.curves[this.clickedCurveIdx], this.canvasProperties);
                 this.reDraw();
             }
         }
