@@ -67,6 +67,7 @@ export class GraphSketcher {
     public  checkPointsRedo: Checkpoint[] = [];
 
     public static CURVE_LIMIT = 3;
+    public static CLIP_RADIUS = 15;
     public static MOUSE_DETECT_RADIUS = 20;
     public static IMPORTANT_POINT_DETECT_RADIUS = 30;
     public static REQUIRED_CURVE_ON_SCREEN_RATIO = 0.50; // 50% of a curves points must be on screen or it will be deleted
@@ -625,21 +626,27 @@ export class GraphSketcher {
             const dx = mousePosition[0] - this.prevMousePt[0];
             const dy = mousePosition[1] - this.prevMousePt[1];
             this.prevMousePt = mousePosition;
+
             GraphUtils.translateCurve(this._state.curves[this.movedCurveIdx], dx, dy, this.canvasProperties);
+            
             this.outOfBoundsCurvePoint = this.isCurveOutsidePlot(this.movedCurveIdx) ? this.getAveragePoint(this._state.curves[this.movedCurveIdx].pts) : undefined;
             this.reDraw();
         } else if (this.action === Action.ROTATE_CURVE && isDefined(this.clickedCurveIdx) && isDefined(this._state.curves) && isDefined(this.rotationCenter)) {
             const curve = this._state.curves[this.clickedCurveIdx];
             const startingAngle = GraphUtils.getAngle(this.rotationCenter, this.prevMousePt);
             const currentAngle = GraphUtils.getAngle(this.rotationCenter, mousePosition);
+
             GraphUtils.rotateCurve(curve, currentAngle - startingAngle, this.rotationCenter);
+            
             this.prevMousePt = mousePosition;
-            this.outOfBoundsCurvePoint = this.isCurveOutsidePlot(this.clickedCurveIdx) ? this.getAveragePoint(this._state.curves[this.clickedCurveIdx].pts) : undefined;
+            
             if (this.hiddenKnotCurveIdxs.length === 0 || !this.hiddenKnotCurveIdxs.includes(this.clickedCurveIdx)) {
                 this.hiddenKnotCurveIdxs.push(this.clickedCurveIdx);
             }
-            this.reDraw();
+            
             GraphUtils.recalculateCurveProperties(curve, this.canvasProperties);
+            this.outOfBoundsCurvePoint = this.isCurveOutsidePlot(this.clickedCurveIdx) ? this.getAveragePoint(this._state.curves[this.clickedCurveIdx].pts) : undefined;
+            this.reDraw();
         } else if (this.action === Action.STRETCH_CURVE && isDefined(this.clickedCurveIdx) && isDefined(this._state.curves)) {
             this.p.cursor(this.p.MOVE);
 
@@ -730,10 +737,10 @@ export class GraphSketcher {
                     GraphUtils.stretchCurve(currentCurve, orx, ory, nrx, ory, currentCurve.minX, (currentCurve.minY + currentCurve.maxY)/2);
                     break;
             }
-            this.outOfBoundsCurvePoint = this.isCurveOutsidePlot(this.clickedCurveIdx) ? this.getAveragePoint(this._state.curves[this.clickedCurveIdx].pts) : undefined;
-            this.reDraw();
             this.graphView.drawCorner(this.stretchMode || "none", currentCurve);
 
+            this.outOfBoundsCurvePoint = this.isCurveOutsidePlot(this.clickedCurveIdx) ? this.getAveragePoint(this._state.curves[this.clickedCurveIdx].pts) : undefined;
+            this.reDraw();
         } else if (this.action === Action.DRAW_CURVE && this.drawnColorIdx >= 0) {
             this.p.cursor(this.p.CROSS);
             if (isDefined(this._state.curves) && this._state.curves.length < GraphSketcher.CURVE_LIMIT) {
@@ -787,7 +794,6 @@ export class GraphSketcher {
                     this.p.pop();
                     this.drawnPts.push([constrainedMouseX, constrainedMouseY]);
                 }
-
             }
         }
     };
@@ -868,25 +874,24 @@ export class GraphSketcher {
 
                 this.checkPointsUndo.push(this.checkPoint);
                 this.checkPointsRedo = [];
-                // scope.$apply();
 
                 // adjustment of start and end to attach to the axis automatically.
-                if (Math.abs(this.drawnPts[0][1] - this.canvasProperties.centerPx[1]) < 3) {
+                if (Math.abs(this.drawnPts[0][1] - this.canvasProperties.centerPx[1]) < GraphSketcher.CLIP_RADIUS) {
                     this.drawnPts[0][1] = this.canvasProperties.centerPx[1];
                 }
-                if (Math.abs(this.drawnPts[0][0] - this.canvasProperties.centerPx[0]) < 3) {
+                if (Math.abs(this.drawnPts[0][0] - this.canvasProperties.centerPx[0]) < GraphSketcher.CLIP_RADIUS) {
                     this.drawnPts[0][0] = this.canvasProperties.centerPx[0];
                 }
-                if (Math.abs(this.drawnPts[this.drawnPts.length - 1][1] - this.canvasProperties.centerPx[1]) < 3) {
+                if (Math.abs(this.drawnPts[this.drawnPts.length - 1][1] - this.canvasProperties.centerPx[1]) < GraphSketcher.CLIP_RADIUS) {
                     this.drawnPts[this.drawnPts.length - 1][1] = this.canvasProperties.centerPx[1];
                 }
-                if (Math.abs(this.drawnPts[this.drawnPts.length - 1][0] - this.canvasProperties.centerPx[0]) < 3) {
+                if (Math.abs(this.drawnPts[this.drawnPts.length - 1][0] - this.canvasProperties.centerPx[0]) < GraphSketcher.CLIP_RADIUS) {
                     this.drawnPts[this.drawnPts.length - 1][0] = this.canvasProperties.centerPx[0];
                 }
 
                 let pts: Point[] = [];
                 if (this.selectedLineType === LineType.BEZIER) {
-                    if (GraphUtils.getDist(this.drawnPts[0], this.drawnPts[this.drawnPts.length - 1]) < 15) {
+                    if (GraphUtils.getDist(this.drawnPts[0], this.drawnPts[this.drawnPts.length - 1]) < GraphSketcher.CLIP_RADIUS) {
                         this.drawnPts.push(this.drawnPts[0]);
                         curve.isClosed = true;
                     }
