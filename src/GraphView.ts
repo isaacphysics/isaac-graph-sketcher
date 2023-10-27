@@ -45,8 +45,8 @@ export default class GraphView {
         // want to connect closest points x,y wise, not just x wise
         const pts = curve.pts;
         for (let i = 1; i < pts.length; i++) {
-            if (pts[i][0] - pts[i-1][0] < 100 && pts[i][1] - pts[i-1][1] < 100) {// 100 chosen as close enough to reliably be the same curve
-                this.p.line(pts[i-1][0], pts[i-1][1], pts[i][0], pts[i][1]);
+            if (pts[i].x - pts[i-1].x < 100 && pts[i].y - pts[i-1].y < 100) {// 100 chosen as close enough to reliably be the same curve
+                this.p.line(pts[i-1].x, pts[i-1].y, pts[i].x, pts[i].y);
             }
         }
 
@@ -70,8 +70,8 @@ export default class GraphView {
 
     drawKnot(knot: Point, color?: number[]) {
         // Don't draw knots that are outside the plot area
-        if (knot[0] < this.canvasProperties.plotStartPx[0] || knot[0] > this.canvasProperties.plotEndPx[0] ||
-            knot[1] < this.canvasProperties.plotStartPx[1] || knot[1] > this.canvasProperties.plotEndPx[1]
+        if (knot.x < this.canvasProperties.plotStartPx.x || knot.x > this.canvasProperties.plotEndPx.x ||
+            knot.y < this.canvasProperties.plotStartPx.y || knot.y > this.canvasProperties.plotEndPx.y
         ) {
             return;
         }
@@ -82,8 +82,8 @@ export default class GraphView {
         this.p.noFill();
         this.p.stroke(color);
         this.p.strokeWeight(1.5);
-        this.p.line(knot[0] - 3, knot[1] - 3, knot[0] + 3, knot[1] + 3);
-        this.p.line(knot[0] + 3, knot[1] - 3, knot[0] - 3, knot[1] + 3);
+        this.p.line(knot.x - 3, knot.y - 3, knot.x + 3, knot.y + 3);
+        this.p.line(knot.x + 3, knot.y - 3, knot.x - 3, knot.y + 3);
         this.p.pop();
     }
 
@@ -92,8 +92,8 @@ export default class GraphView {
         this.p.noFill();
         this.p.stroke(this.KNOT_DETECT_COLOR);
         this.p.strokeWeight(2);
-        this.p.line(knot[0] - 5, knot[1] - 5, knot[0] + 5, knot[1] + 5);
-        this.p.line(knot[0] + 5, knot[1] - 5, knot[0] - 5, knot[1] + 5);
+        this.p.line(knot.x - 5, knot.y - 5, knot.x + 5, knot.y + 5);
+        this.p.line(knot.x + 5, knot.y - 5, knot.x - 5, knot.y + 5);
         this.p.pop();
     }
 
@@ -211,19 +211,19 @@ export default class GraphView {
 
     drawArrowhead(at: Point, axis: Dimension) {
         if (axis == Dimension.Y) {
-            this.backgroundGraphic.vertex(at[0] - 5, at[1] + 10);
-            this.backgroundGraphic.vertex(at[0], at[1]);
-            this.backgroundGraphic.vertex(at[0] + 5, at[1] + 10);
+            this.backgroundGraphic.vertex(at.x - 5, at.y + 10);
+            this.backgroundGraphic.vertex(at.x, at.y);
+            this.backgroundGraphic.vertex(at.x + 5, at.y + 10);
         } else if (axis == Dimension.X) {
-            this.backgroundGraphic.vertex(at[0] - 10, at[1] - 5);
-            this.backgroundGraphic.vertex(at[0], at[1]);
-            this.backgroundGraphic.vertex(at[0] - 10, at[1] + 5);
+            this.backgroundGraphic.vertex(at.x - 10, at.y - 5);
+            this.backgroundGraphic.vertex(at.x, at.y);
+            this.backgroundGraphic.vertex(at.x - 10, at.y + 5);
         }
     }
 
     drawHorizontalAxis(curveStrokeWeight: number) {
-        const xAxisStart: Point = [this.canvasProperties.centerPx[0] - this.canvasProperties.axisLengthPx/2 + this.PADDING, this.canvasProperties.centerPx[1]];
-        const xAxisEnd: Point = [this.canvasProperties.centerPx[0] + this.canvasProperties.axisLengthPx/2 - this.PADDING, this.canvasProperties.centerPx[1]];
+        const xAxisStart: Point = new Point(this.canvasProperties.centerPx.x - this.canvasProperties.axisLengthPx/2 + this.PADDING, this.canvasProperties.centerPx.y);
+        const xAxisEnd: Point = new Point(this.canvasProperties.centerPx.x + this.canvasProperties.axisLengthPx/2 - this.PADDING, this.canvasProperties.centerPx.y);
 
         this.backgroundGraphic.push();
 
@@ -233,8 +233,8 @@ export default class GraphView {
         this.backgroundGraphic.noFill();
 
         this.backgroundGraphic.beginShape();
-        this.backgroundGraphic.vertex(xAxisStart[0], xAxisStart[1]);
-        this.backgroundGraphic.vertex(xAxisEnd[0], xAxisEnd[1]);
+        this.backgroundGraphic.vertex(xAxisStart.x, xAxisStart.y);
+        this.backgroundGraphic.vertex(xAxisEnd.x, xAxisEnd.y);
         this.drawArrowhead(xAxisEnd, Dimension.X);
         this.backgroundGraphic.endShape();
 
@@ -242,8 +242,8 @@ export default class GraphView {
     }
 
     drawVerticalAxis(curveStrokeWeight: number) {
-        const yAxisStart: Point = [this.canvasProperties.centerPx[0], this.canvasProperties.centerPx[1] - this.canvasProperties.axisLengthPx / 2 + this.PADDING];
-        const yAxisEnd: Point = [this.canvasProperties.centerPx[0], this.canvasProperties.centerPx[1] + this.canvasProperties.axisLengthPx / 2 - this.PADDING];
+        const yAxisStart: Point = new Point(this.canvasProperties.centerPx.x, this.canvasProperties.centerPx.y - this.canvasProperties.axisLengthPx / 2 + this.PADDING);
+        const yAxisEnd: Point = new Point(this.canvasProperties.centerPx.x, this.canvasProperties.centerPx.y + this.canvasProperties.axisLengthPx / 2 - this.PADDING);
 
         this.backgroundGraphic.push();
 
@@ -254,8 +254,8 @@ export default class GraphView {
 
         this.backgroundGraphic.beginShape();
         this.drawArrowhead(yAxisStart, Dimension.Y);
-        this.backgroundGraphic.vertex(yAxisStart[0], yAxisStart[1]);
-        this.backgroundGraphic.vertex(yAxisEnd[0], yAxisEnd[1]);
+        this.backgroundGraphic.vertex(yAxisStart.x, yAxisStart.y);
+        this.backgroundGraphic.vertex(yAxisEnd.x, yAxisEnd.y);
         this.backgroundGraphic.endShape();
 
         this.backgroundGraphic.pop();
@@ -273,7 +273,7 @@ export default class GraphView {
 
         // draw grid lines
         // use top-left of drawable area as origin
-        this.backgroundGraphic.translate(this.canvasProperties.plotStartPx[0], this.canvasProperties.plotStartPx[1]);
+        this.backgroundGraphic.translate(this.canvasProperties.plotStartPx.x, this.canvasProperties.plotStartPx.y);
 
         const cellSize = this.canvasProperties.axisLengthPx / this.CELLS;
         for (let cellNo = 1; cellNo < this.CELLS; cellNo++) {
@@ -295,9 +295,9 @@ export default class GraphView {
         this.backgroundGraphic.strokeWeight(0.5);
         this.backgroundGraphic.fill(0);
 
-        this.backgroundGraphic.text("O", this.canvasProperties.centerPx[0] - 15, this.canvasProperties.centerPx[1] + 15);
-        this.backgroundGraphic.text("x", this.canvasProperties.centerPx[0] + this.canvasProperties.axisLengthPx/2 - this.PADDING, this.canvasProperties.centerPx[1] + 15);
-        this.backgroundGraphic.text("y", this.canvasProperties.centerPx[0] + 5, this.canvasProperties.centerPx[1] - this.canvasProperties.axisLengthPx / 2 + this.PADDING);
+        this.backgroundGraphic.text("O", this.canvasProperties.centerPx.x - 15, this.canvasProperties.centerPx.y + 15);
+        this.backgroundGraphic.text("x", this.canvasProperties.centerPx.x + this.canvasProperties.axisLengthPx/2 - this.PADDING, this.canvasProperties.centerPx.y + 15);
+        this.backgroundGraphic.text("y", this.canvasProperties.centerPx.x + 5, this.canvasProperties.centerPx.y - this.canvasProperties.axisLengthPx / 2 + this.PADDING);
 
         this.backgroundGraphic.pop();
     }
@@ -316,14 +316,14 @@ export default class GraphView {
         this.p.push();
         this.p.noStroke();
         this.p.fill(255, 180);
-        this.p.rect(0, 0, canvasProperties.plotStartPx[0], canvasProperties.heightPx);
-        this.p.rect(canvasProperties.plotEndPx[0], 0, canvasProperties.plotStartPx[0], canvasProperties.heightPx);
+        this.p.rect(0, 0, canvasProperties.plotStartPx.x, canvasProperties.heightPx);
+        this.p.rect(canvasProperties.plotEndPx.x, 0, canvasProperties.plotStartPx.x, canvasProperties.heightPx);
         this.p.pop();
     }
 
     drawOutOfBoundsWarning(point: Point, canvasProperties: CanvasProperties) {
-        const x = this.p.constrain(point[0], canvasProperties.plotStartPx[0] + 20, canvasProperties.plotEndPx[0] - 20);
-        const y = this.p.constrain(point[1], canvasProperties.plotStartPx[1] + 20, canvasProperties.plotEndPx[1] - 20);
+        const x = this.p.constrain(point.x, canvasProperties.plotStartPx.x + 20, canvasProperties.plotEndPx.x - 20);
+        const y = this.p.constrain(point.y, canvasProperties.plotStartPx.y + 20, canvasProperties.plotEndPx.y - 20);
         // Draw a red cross centered at (x, y) to indicate that a curve will be deleted if it is moved there
         this.p.push();
         this.p.stroke(255, 0, 0);
@@ -384,11 +384,11 @@ export default class GraphView {
     }
 
     debugDrawCoordinates(point: Point) {
-        const plotSpaceCoordPx: Point = [point[0] - this.canvasProperties.plotStartPx[0], point[1] - this.canvasProperties.plotStartPx[1]];
+        const plotSpaceCoordPx: Point = new Point(point.x - this.canvasProperties.plotStartPx.x, point.y - this.canvasProperties.plotStartPx.y);
 
         this.p.push();
-        this.p.text(`Screen space: (${point[0]}, ${point[1]})\nPlot space (${plotSpaceCoordPx[0]},${plotSpaceCoordPx[1]})`,
-            point[0], point[1]);
+        this.p.text(`Screen space: (${point.x}, ${point.y})\nPlot space (${plotSpaceCoordPx.x},${plotSpaceCoordPx.y})`,
+            point.x, point.y);
         this.p.pop();
     }
 }

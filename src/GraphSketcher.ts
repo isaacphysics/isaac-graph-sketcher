@@ -5,7 +5,15 @@ import * as GraphUtils from './GraphUtils';
 import _cloneDeep from 'lodash/cloneDeep';
 import _isEqual from 'lodash/isEqual';
 
-export type Point = number[];
+export class Point {
+    x: number;
+    y: number;
+
+    constructor(x: number, y: number) {
+        this.x = x;
+        this.y = y;
+    }
+}
 export class Curve {
     pts: Point[] = [];
     minX: number = 0;
@@ -75,13 +83,13 @@ export class GraphSketcher {
     // action recorder
     private action: Action = Action.NO_ACTION;
     private isMouseDragged: boolean = false;
-    private releasePt: Point = [0,0];
+    private releasePt = new Point(0,0);
 
     // for drawing curve
     private drawnPts: Point[] = [];
     private drawnColorIdx: number = -1;
 
-    private prevMousePt: Point = [0,0];
+    private prevMousePt = new Point(0, 0);
 
     // for moving and stretching curve
     private movedCurveIdx?: number;
@@ -211,10 +219,10 @@ export class GraphSketcher {
             heightPx: height,
             axisLengthPx: Math.min(width, height),
             // The canvas-space center of the display (equivalent to the cartesian plot's origin)
-            centerPx: [width / 2, height / 2],
+            centerPx: new Point(width / 2, height / 2),
             // The canvas-space start and end of the drawable area (top left and bottom right of cartesian plot)
-            plotStartPx: [width / 2 - Math.min(width, height) / 2, height / 2 - Math.min(width, height) / 2],
-            plotEndPx: [width / 2 + Math.min(width, height) / 2, height / 2 + Math.min(width, height) / 2]
+            plotStartPx: new Point(width / 2 - Math.min(width, height) / 2, height / 2 - Math.min(width, height) / 2),
+            plotEndPx: new Point(width / 2 + Math.min(width, height) / 2, height / 2 + Math.min(width, height) / 2)
         };
     }
 
@@ -254,16 +262,16 @@ export class GraphSketcher {
             const top = rect.top;
             const width = rect.width;
             const height = rect.height;
-            return pt[0] > left && pt[0] < left + width && pt[1] > top && pt[1] < top + height;
+            return pt.x > left && pt.x < left + width && pt.y > top && pt.y < top + height;
         }
         return false;
     };
 
     private isPointInsidePlot = (pt: Point) => {
-        return pt[0] > this.canvasProperties.plotStartPx[0]
-            && pt[0] < this.canvasProperties.plotEndPx[0]
-            && pt[1] > this.canvasProperties.plotStartPx[1]
-            && pt[1] < this.canvasProperties.plotEndPx[1];
+        return pt.x > this.canvasProperties.plotStartPx.x
+            && pt.x < this.canvasProperties.plotEndPx.x
+            && pt.y > this.canvasProperties.plotStartPx.y
+            && pt.y < this.canvasProperties.plotEndPx.y;
     };
 
     private areMostPointsOutsidePlot = (pts: Point[]) => {
@@ -286,12 +294,12 @@ export class GraphSketcher {
         let avgX = 0;
         let avgY = 0;
         for (let i = 0; i < pts.length; i++) {
-            avgX += pts[i][0];
-            avgY += pts[i][1];
+            avgX += pts[i].x;
+            avgY += pts[i].y;
         }
         avgX /= pts.length;
         avgY /= pts.length;
-        return [avgX, avgY];
+        return new Point(avgX, avgY);
     };
 
     // Mouse is inactive if over buttons - stops curves being drawn where they can't be seen
@@ -357,7 +365,7 @@ export class GraphSketcher {
         const mousePosition: Point = GraphUtils.getMousePt(e);
 
         const detect = (x: number, y: number) => {
-            return (Math.abs(mousePosition[0] - x) < GraphSketcher.MOUSE_DETECT_RADIUS && Math.abs(mousePosition[1] - y) < GraphSketcher.MOUSE_DETECT_RADIUS);
+            return (Math.abs(mousePosition.x - x) < GraphSketcher.MOUSE_DETECT_RADIUS && Math.abs(mousePosition.y - y) < GraphSketcher.MOUSE_DETECT_RADIUS);
         };
 
         // this function does not react if the mouse is over buttons or outside the canvas.
@@ -437,7 +445,7 @@ export class GraphSketcher {
                 } else {
                     makeDiamond(c.maxX + 16, c.maxY + 16, 4);
                 }
-            } else if (mousePosition[0] >= c.minX && mousePosition[0] <= c.maxX && mousePosition[1] >= c.minY && mousePosition[1] <= c.maxY) {
+            } else if (mousePosition.x >= c.minX && mousePosition.x <= c.maxX && mousePosition.y >= c.minY && mousePosition.y <= c.maxY) {
                 this.graphView.drawStretchBox(this.clickedCurveIdx, this._state.curves);
                 this.p.cursor(this.p.MOVE);
             }
@@ -479,7 +487,7 @@ export class GraphSketcher {
         }
 
         this.movedCurveIdx = undefined;
-        this.prevMousePt = [0,0];
+        this.prevMousePt = new Point(0, 0);
         this.outOfBoundsCurvePoint = undefined;
 
         const mousePosition = GraphUtils.getMousePt(e);
@@ -495,7 +503,7 @@ export class GraphSketcher {
         }
 
         const detect = (x: number, y: number) => {
-            return (Math.abs(mousePosition[0] - x) < GraphSketcher.MOUSE_DETECT_RADIUS && Math.abs(mousePosition[1] - y) < GraphSketcher.MOUSE_DETECT_RADIUS);
+            return (Math.abs(mousePosition.x - x) < GraphSketcher.MOUSE_DETECT_RADIUS && Math.abs(mousePosition.y - y) < GraphSketcher.MOUSE_DETECT_RADIUS);
         };
         // record down mousePosition status, may be used later for undo.
         this.checkPoint = {};
@@ -540,7 +548,7 @@ export class GraphSketcher {
                 this.action = Action.ROTATE_CURVE;
                 this.clickedKnot = undefined;
                 this.prevMousePt = mousePosition;
-                this.rotationCenter = [(c.minX + c.maxX) / 2, (c.minY + c.maxY) / 2];
+                this.rotationCenter = new Point((c.minX + c.maxX) / 2, (c.minY + c.maxY) / 2);
 
                 return;
             }
@@ -623,8 +631,8 @@ export class GraphSketcher {
         } else if (this.action === Action.MOVE_CURVE && isDefined(this.movedCurveIdx) && isDefined(this._state.curves)) {
             this.p.cursor(this.p.MOVE);
 
-            const dx = mousePosition[0] - this.prevMousePt[0];
-            const dy = mousePosition[1] - this.prevMousePt[1];
+            const dx = mousePosition.x - this.prevMousePt.x;
+            const dy = mousePosition.y - this.prevMousePt.y;
             this.prevMousePt = mousePosition;
 
             GraphUtils.translateCurve(this._state.curves[this.movedCurveIdx], dx, dy, this.canvasProperties);
@@ -650,8 +658,8 @@ export class GraphSketcher {
         } else if (this.action === Action.STRETCH_CURVE && isDefined(this.clickedCurveIdx) && isDefined(this._state.curves)) {
             this.p.cursor(this.p.MOVE);
 
-            const dx = mousePosition[0] - this.prevMousePt[0];
-            const dy = mousePosition[1] - this.prevMousePt[1];
+            const dx = mousePosition.x - this.prevMousePt.x;
+            const dy = mousePosition.y - this.prevMousePt.y;
             this.prevMousePt = mousePosition;
 
             const currentCurve = this._state.curves[this.clickedCurveIdx];
@@ -751,28 +759,28 @@ export class GraphSketcher {
                 let constrainedMouseX: number;
                 if (!this.allowMultiValuedFunctions) {
                     if (this.drawnPts.length > 1) {
-                        const lastPointOffGrid = this.drawnPts[this.drawnPts.length - 1][0] < this.canvasProperties.plotStartPx[0] || this.drawnPts[this.drawnPts.length - 1][0] > this.canvasProperties.plotEndPx[0];
-                        if (lastPointOffGrid || this.drawnPts[this.drawnPts.length - 1][0] === this.drawnPts[this.drawnPts.length - 2][0]) {
+                        const lastPointOffGrid = this.drawnPts[this.drawnPts.length - 1].x < this.canvasProperties.plotStartPx.x || this.drawnPts[this.drawnPts.length - 1].x > this.canvasProperties.plotEndPx.x;
+                        if (lastPointOffGrid || this.drawnPts[this.drawnPts.length - 1].x === this.drawnPts[this.drawnPts.length - 2].x) {
                             return;
-                        } else if (this.drawnPts[this.drawnPts.length - 1][0] < this.drawnPts[this.drawnPts.length - 2][0]) {
-                            constrainedMouseX = this.p.constrain(mousePosition[0], this.canvasProperties.plotStartPx[0], this.drawnPts[this.drawnPts.length - 1][0] - 0.1);
+                        } else if (this.drawnPts[this.drawnPts.length - 1].x < this.drawnPts[this.drawnPts.length - 2].x) {
+                            constrainedMouseX = this.p.constrain(mousePosition.x, this.canvasProperties.plotStartPx.x, this.drawnPts[this.drawnPts.length - 1].x - 0.1);
                         } else {
-                            constrainedMouseX = this.p.constrain(mousePosition[0], this.drawnPts[this.drawnPts.length - 1][0] + 0.1, this.canvasProperties.plotEndPx[0]);
+                            constrainedMouseX = this.p.constrain(mousePosition.x, this.drawnPts[this.drawnPts.length - 1].x + 0.1, this.canvasProperties.plotEndPx.x);
                         }
                     } else {
                         // Check that there a decent amount of x-movement in the second point so we can be sure of the direction
                         // that the user is trying to draw the curve in
                         // TODO find the right threshold, might need a fair bit of testing
-                        if (this.drawnPts.length > 0 && Math.abs(this.drawnPts[0][0] - mousePosition[0]) < 2 / (Math.max(1, Math.abs(this.drawnPts[0][1] - mousePosition[1])) ** 2)) {
+                        if (this.drawnPts.length > 0 && Math.abs(this.drawnPts[0].x - mousePosition.x) < 2 / (Math.max(1, Math.abs(this.drawnPts[0].y - mousePosition.y)) ** 2)) {
                             return;
                         }
-                        constrainedMouseX = this.p.constrain(mousePosition[0], this.canvasProperties.plotStartPx[0], this.canvasProperties.plotEndPx[0]);
+                        constrainedMouseX = this.p.constrain(mousePosition.x, this.canvasProperties.plotStartPx.x, this.canvasProperties.plotEndPx.x);
                     }
                     // By induction, the x-position of the last three points is (strictly) increasing or decreasing (ignoring some weird edge cases)
                 } else {
-                    constrainedMouseX = this.p.constrain(mousePosition[0], this.canvasProperties.plotStartPx[0], this.canvasProperties.plotEndPx[0]);
+                    constrainedMouseX = this.p.constrain(mousePosition.x, this.canvasProperties.plotStartPx.x, this.canvasProperties.plotEndPx.x);
                 }
-                const constrainedMouseY = this.p.constrain(mousePosition[1], this.canvasProperties.plotStartPx[1], this.canvasProperties.plotEndPx[1]);
+                const constrainedMouseY = this.p.constrain(mousePosition.y, this.canvasProperties.plotStartPx.y, this.canvasProperties.plotEndPx.y);
 
                 this.p.push();
                 this.p.stroke(this.graphView.CURVE_COLORS[this.drawnColorIdx]);
@@ -781,18 +789,18 @@ export class GraphSketcher {
                     this.reDraw();
                     if (this.drawnPts.length > 1) {
                         const initialPoint = this.drawnPts[0];
-                        this.p.line(initialPoint[0], initialPoint[1], constrainedMouseX, constrainedMouseY);                        
+                        this.p.line(initialPoint.x, initialPoint.y, constrainedMouseX, constrainedMouseY);                        
                         this.drawnPts.pop();
                     }
                     this.p.pop();
-                    this.drawnPts.push([constrainedMouseX, constrainedMouseY]);
+                    this.drawnPts.push(new Point(constrainedMouseX, constrainedMouseY));
                 } else {
                     if (this.drawnPts.length > 0) {
                         const precedingPoint = this.drawnPts[this.drawnPts.length - 1];
-                        this.p.line(precedingPoint[0], precedingPoint[1], constrainedMouseX, constrainedMouseY);
+                        this.p.line(precedingPoint.x, precedingPoint.y, constrainedMouseX, constrainedMouseY);
                     }
                     this.p.pop();
-                    this.drawnPts.push([constrainedMouseX, constrainedMouseY]);
+                    this.drawnPts.push(new Point(constrainedMouseX, constrainedMouseY));
                 }
             }
         }
@@ -876,17 +884,17 @@ export class GraphSketcher {
                 this.checkPointsRedo = [];
 
                 // adjustment of start and end to attach to the axis automatically.
-                if (Math.abs(this.drawnPts[0][1] - this.canvasProperties.centerPx[1]) < GraphSketcher.CLIP_RADIUS) {
-                    this.drawnPts[0][1] = this.canvasProperties.centerPx[1];
+                if (Math.abs(this.drawnPts[0].y - this.canvasProperties.centerPx.y) < GraphSketcher.CLIP_RADIUS) {
+                    this.drawnPts[0].y = this.canvasProperties.centerPx.y;
                 }
-                if (Math.abs(this.drawnPts[0][0] - this.canvasProperties.centerPx[0]) < GraphSketcher.CLIP_RADIUS) {
-                    this.drawnPts[0][0] = this.canvasProperties.centerPx[0];
+                if (Math.abs(this.drawnPts[0].x - this.canvasProperties.centerPx.x) < GraphSketcher.CLIP_RADIUS) {
+                    this.drawnPts[0].x = this.canvasProperties.centerPx.x;
                 }
-                if (Math.abs(this.drawnPts[this.drawnPts.length - 1][1] - this.canvasProperties.centerPx[1]) < GraphSketcher.CLIP_RADIUS) {
-                    this.drawnPts[this.drawnPts.length - 1][1] = this.canvasProperties.centerPx[1];
+                if (Math.abs(this.drawnPts[this.drawnPts.length - 1].y - this.canvasProperties.centerPx.y) < GraphSketcher.CLIP_RADIUS) {
+                    this.drawnPts[this.drawnPts.length - 1].y = this.canvasProperties.centerPx.y;
                 }
-                if (Math.abs(this.drawnPts[this.drawnPts.length - 1][0] - this.canvasProperties.centerPx[0]) < GraphSketcher.CLIP_RADIUS) {
-                    this.drawnPts[this.drawnPts.length - 1][0] = this.canvasProperties.centerPx[0];
+                if (Math.abs(this.drawnPts[this.drawnPts.length - 1].x - this.canvasProperties.centerPx.x) < GraphSketcher.CLIP_RADIUS) {
+                    this.drawnPts[this.drawnPts.length - 1].x = this.canvasProperties.centerPx.x;
                 }
 
                 let pts: Point[] = [];
