@@ -36,14 +36,14 @@ export default class GraphView {
     }
 
     drawCurve(curve: Curve, color: number, drawKnots: boolean) {
-        let chosenColor = color < 0 ? this.CURVE_COLORS[curve.colorIdx] : this.CURVE_COLORS[color];
+        const chosenColor = color < 0 ? this.CURVE_COLORS[curve.colorIdx] : this.CURVE_COLORS[color];
 
         this.p.push();
         this.p.stroke(chosenColor);
         this.p.strokeWeight(this.CURVE_STRKWEIGHT);
 
         // want to connect closest points x,y wise, not just x wise
-        let pts = curve.pts;
+        const pts = curve.pts;
         for (let i = 1; i < pts.length; i++) {
             if (pts[i][0] - pts[i-1][0] < 100 && pts[i][1] - pts[i-1][1] < 100) {// 100 chosen as close enough to reliably be the same curve
                 this.p.line(pts[i-1][0], pts[i-1][1], pts[i][0], pts[i][1]);
@@ -53,7 +53,7 @@ export default class GraphView {
         this.p.pop();
 
         if (drawKnots) {   
-            // draw x intercepts, y intercepts and turning points
+            // draw x intercepts, y intercepts, turning points, and end points
             this.drawKnots(curve.interX);
             this.drawKnots(curve.interY);
             this.drawKnots(curve.maxima);
@@ -103,7 +103,7 @@ export default class GraphView {
         }
 
         if (begin > end) {
-            let tmp = begin;
+            const tmp = begin;
             begin = end;
             end = tmp;
         }
@@ -112,7 +112,7 @@ export default class GraphView {
         this.p.stroke(this.DOT_LINE_COLOR);
         this.p.strokeWeight(this.CURVE_STRKWEIGHT);
 
-        let step = this.DOT_LINE_STEP;
+        const step = this.DOT_LINE_STEP;
         let toDraw = true;
         let y = begin;
         while (y + step < end) {
@@ -135,7 +135,7 @@ export default class GraphView {
         }
 
         if (begin > end) {
-            let tmp = begin;
+            const tmp = begin;
             begin = end;
             end = tmp;
         }
@@ -144,7 +144,7 @@ export default class GraphView {
         this.p.stroke(this.DOT_LINE_COLOR);
         this.p.strokeWeight(this.CURVE_STRKWEIGHT);
 
-        let step = this.DOT_LINE_STEP;
+        const step = this.DOT_LINE_STEP;
         let toDraw = true;
         let x = begin;
         while (x + step < end) {
@@ -173,34 +173,34 @@ export default class GraphView {
 
         if ((!idx || (idx && !curves[idx])) && idx !== 0) return;
 
-        let curve = curves[idx];
+        const curve = curves[idx];
 
-        let minX = curve.minX;
-        let maxX = curve.maxX;
-        let minY = curve.minY;
-        let maxY = curve.maxY;
+        const minX = curve.minX;
+        const maxX = curve.maxX;
+        const minY = curve.minY;
+        const maxY = curve.maxY;
 
         this.p.push();
         this.p.stroke(this.DOT_LINE_COLOR);
         this.p.strokeWeight(0.5);
+        // draw box
         this.p.line(minX, minY, maxX, minY);
         this.p.line(maxX, minY, maxX, maxY);
         this.p.line(maxX, maxY, minX, maxY);
         this.p.line(minX, maxY, minX, minY);
 
         this.p.fill(255);
+        // stretch: corner squares
         this.p.rect(minX - 4, minY - 4, 8, 8);
         this.p.rect(maxX - 4, minY - 4, 8, 8);
         this.p.rect(minX - 4, maxY - 4, 8, 8);
         this.p.rect(maxX - 4, maxY - 4, 8, 8);
+        // stretch: side triangles
         this.p.triangle((minX + maxX)/2 - 5, minY - 2, (minX + maxX)/2 + 5, minY - 2, (minX + maxX)/2, minY - 7);
         this.p.triangle((minX + maxX)/2 - 5, maxY + 2, (minX + maxX)/2 + 5, maxY + 2, (minX + maxX)/2, maxY + 7);
         this.p.triangle(minX - 2, (minY + maxY) / 2 - 5, minX - 2, (minY + maxY) / 2 + 5, minX - 7, (minY + maxY) / 2);
         this.p.triangle(maxX + 2, (minY + maxY) / 2 - 5, maxX + 2, (minY + maxY) / 2 + 5, maxX + 7, (minY + maxY) / 2);
-        // this.p.arc(minX - 4, minY - 4, 29, 29, this.p.PI + 0.2, 3*this.p.HALF_PI - 0.2, this.p.OPEN);
-        // this.p.arc(minX - 4, minY - 4, 24, 24, this.p.PI + 0.2, 3*this.p.HALF_PI - 0.2, this.p.OPEN);
-        // this.p.triangle(minX - 8, minY - 20, minX - 8, minY - 12, minX - 4, minY - 16);
-        // this.p.triangle(minX - 20, minY - 8, minX - 16, minY - 4, minX - 12, minY - 8);
+        // rotate: corner diamonds
         this.makeDiamond(minX - 16, minY - 16, 4);
         this.makeDiamond(maxX + 16, minY - 16, 4);
         this.makeDiamond(minX - 16, maxY + 16, 4);
@@ -222,8 +222,8 @@ export default class GraphView {
     }
 
     drawHorizontalAxis(curveStrokeWeight: number) {
-        let xAxisStart: Point = [this.canvasProperties.centerPx[0] - this.canvasProperties.axisLengthPx/2 + this.PADDING, this.canvasProperties.centerPx[1]]
-        let xAxisEnd: Point = [this.canvasProperties.centerPx[0] + this.canvasProperties.axisLengthPx/2 - this.PADDING, this.canvasProperties.centerPx[1]]
+        const xAxisStart: Point = [this.canvasProperties.centerPx[0] - this.canvasProperties.axisLengthPx/2 + this.PADDING, this.canvasProperties.centerPx[1]];
+        const xAxisEnd: Point = [this.canvasProperties.centerPx[0] + this.canvasProperties.axisLengthPx/2 - this.PADDING, this.canvasProperties.centerPx[1]];
 
         this.backgroundGraphic.push();
 
@@ -242,8 +242,8 @@ export default class GraphView {
     }
 
     drawVerticalAxis(curveStrokeWeight: number) {
-        let yAxisStart: Point = [this.canvasProperties.centerPx[0], this.canvasProperties.centerPx[1] - this.canvasProperties.axisLengthPx / 2 + this.PADDING]
-        let yAxisEnd: Point = [this.canvasProperties.centerPx[0], this.canvasProperties.centerPx[1] + this.canvasProperties.axisLengthPx / 2 - this.PADDING]
+        const yAxisStart: Point = [this.canvasProperties.centerPx[0], this.canvasProperties.centerPx[1] - this.canvasProperties.axisLengthPx / 2 + this.PADDING];
+        const yAxisEnd: Point = [this.canvasProperties.centerPx[0], this.canvasProperties.centerPx[1] + this.canvasProperties.axisLengthPx / 2 - this.PADDING];
 
         this.backgroundGraphic.push();
 
@@ -275,12 +275,12 @@ export default class GraphView {
         // use top-left of drawable area as origin
         this.backgroundGraphic.translate(this.canvasProperties.plotStartPx[0], this.canvasProperties.plotStartPx[1]);
 
-        let cellSize = this.canvasProperties.axisLengthPx / this.CELLS;
+        const cellSize = this.canvasProperties.axisLengthPx / this.CELLS;
         for (let cellNo = 1; cellNo < this.CELLS; cellNo++) {
             // horizontal
-            this.backgroundGraphic.line(0, cellSize * cellNo, this.canvasProperties.axisLengthPx, cellSize * cellNo)
+            this.backgroundGraphic.line(0, cellSize * cellNo, this.canvasProperties.axisLengthPx, cellSize * cellNo);
             // vertical
-            this.backgroundGraphic.line(cellSize * cellNo, 0, cellSize * cellNo, this.canvasProperties.axisLengthPx)
+            this.backgroundGraphic.line(cellSize * cellNo, 0, cellSize * cellNo, this.canvasProperties.axisLengthPx);
         }
 
         this.backgroundGraphic.pop();
@@ -384,11 +384,11 @@ export default class GraphView {
     }
 
     debugDrawCoordinates(point: Point) {
-        const plotSpaceCoordPx: Point = [point[0] - this.canvasProperties.plotStartPx[0], point[1] - this.canvasProperties.plotStartPx[1]]
+        const plotSpaceCoordPx: Point = [point[0] - this.canvasProperties.plotStartPx[0], point[1] - this.canvasProperties.plotStartPx[1]];
 
-        this.p.push()
+        this.p.push();
         this.p.text(`Screen space: (${point[0]}, ${point[1]})\nPlot space (${plotSpaceCoordPx[0]},${plotSpaceCoordPx[1]})`,
-            point[0], point[1])
-        this.p.pop()
+            point[0], point[1]);
+        this.p.pop();
     }
-};
+}
