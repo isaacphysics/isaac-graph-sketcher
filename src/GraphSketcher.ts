@@ -748,6 +748,9 @@ export class GraphSketcher {
             }
             this.outOfBoundsCurvePoint = this.isCurveOutsidePlot(this.clickedCurveIdx) ? this.getAveragePoint(this._state.curves[this.clickedCurveIdx].pts) : undefined;
             this.reDraw();
+            if (this.hiddenKnotCurveIdxs.length === 0 || !this.hiddenKnotCurveIdxs.includes(this.clickedCurveIdx)) {
+                this.hiddenKnotCurveIdxs.push(this.clickedCurveIdx);
+            }
             this.graphView.drawCorner(this.stretchMode || "none", currentCurve);
 
         } else if (this.action === Action.DRAW_CURVE && this.drawnColorIdx >= 0) {
@@ -862,15 +865,19 @@ export class GraphSketcher {
             this.outOfBoundsCurvePoint = undefined;
             this.reDraw();
 
-        } else if (this.action === Action.STRETCH_CURVE || this.action === Action.STRETCH_POINT) {
+        } else if ((this.action === Action.STRETCH_CURVE || this.action === Action.STRETCH_POINT) && isDefined(this.clickedCurveIdx) && isDefined(this._state.curves)) {
             this.checkPointsUndo.push(this.checkPoint);
             this.checkPointsRedo = [];
+            
             // Delete the curve if it is has been marked as out of bounds
             if (isDefined(this.clickedCurveIdx) && isDefined(this._state.curves) && this.outOfBoundsCurvePoint) {
                 this._state.curves.splice(this.clickedCurveIdx, 1);
                 this.clickedCurveIdx = undefined;
                 this.outOfBoundsCurvePoint = undefined;
                 this.reDraw();
+            } else {
+                const curve = this._state.curves[this.clickedCurveIdx];
+                GraphUtils.setCurveProperties(curve, curve.pts, this.selectedLineType, this.canvasProperties, this.drawnColorIdx);
             }
         } else if (this.action === Action.DRAW_CURVE) {
 
