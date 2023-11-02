@@ -1,4 +1,4 @@
-import {CanvasProperties, Curve, Dimension, GraphSketcherState, LineType, Point} from "./GraphSketcher";
+import {CanvasProperties, Curve, Dimension, GraphSketcher, GraphSketcherState, Point} from "./GraphSketcher";
 import _isEqual from 'lodash/isEqual';
 
 // undefined|null checker and type guard all-in-wonder.
@@ -12,7 +12,7 @@ const numOfPts = 200;
 
 // methods used in manipulating the graphs
 export function getDist(pt1: Point, pt2: Point) {
-    return Math.sqrt(Math.pow(pt1[0] - pt2[0], 2) + Math.pow(pt1[1] - pt2[1], 2));
+    return Math.sqrt(Math.pow(pt1.x - pt2.x, 2) + Math.pow(pt1.y - pt2.y, 2));
 }
 
 
@@ -21,7 +21,7 @@ function mod(n: number, m: number) {
 }
 
 export function getAngle(pt1: Point, pt2: Point) {
-    return Math.atan2(pt2[1] - pt1[1], pt2[0] - pt1[0]);
+    return Math.atan2(pt2.y - pt1.y, pt2.x - pt1.x);
 }
 
 /*
@@ -40,7 +40,7 @@ export function encodeData(trunc: boolean, canvasProperties: CanvasProperties, c
             if (pts.length === 0) return 0;
             let min = canvasProperties.widthPx;
             for (let i = 0; i < pts.length; i++) {
-                min = Math.min(min, pts[i][0]);
+                min = Math.min(min, pts[i].x);
             }
             return min;
         }
@@ -53,21 +53,21 @@ export function encodeData(trunc: boolean, canvasProperties: CanvasProperties, c
     }
 
     function normalisePoint(point: Point, truncate: boolean): Point {
-        let x = normalise(point[0], Dimension.X);
-        let y = normalise(point[1], Dimension.Y);
+        let x = normalise(point.x, Dimension.X);
+        let y = normalise(point.y, Dimension.Y);
         if (truncate) {
             x = Math.round(x * 10000) / 10000;
             y = Math.round(y * 10000) / 10000;
         }
-        return createPoint(x, y);
+        return new Point(x, y);
     }
 
     function normalise(value: number, dimension: Dimension): number {
         if (dimension == Dimension.X) {
-            return (value - canvasProperties.centerPx[0]) / canvasProperties.axisLengthPx;
+            return (value - canvasProperties.centerPx.x) / canvasProperties.axisLengthPx;
         }
         else if (dimension == Dimension.Y) {
-            return (canvasProperties.centerPx[1] - value) / canvasProperties.axisLengthPx;
+            return (canvasProperties.centerPx.y - value) / canvasProperties.axisLengthPx;
         }
         return 0;
     }
@@ -98,14 +98,14 @@ Converts all curves held in GraphSketcherState from abstract Cartesian coordinat
 export function decodeData(data: GraphSketcherState, canvasProperties: CanvasProperties): GraphSketcherState {
 
     function denormalisePoint(point: Point): Point {
-        return createPoint(denormalise(point[0], Dimension.X), denormalise(point[1], Dimension.Y));
+        return new Point(denormalise(point.x, Dimension.X), denormalise(point.y, Dimension.Y));
     }
 
     function denormalise(value: number, dimension: Dimension) {
         if (dimension == Dimension.X) {
-            return value * canvasProperties.axisLengthPx + canvasProperties.centerPx[0];
+            return value * canvasProperties.axisLengthPx + canvasProperties.centerPx.x;
         } else if (dimension == Dimension.Y) {
-            return canvasProperties.centerPx[1] - value * canvasProperties.axisLengthPx;
+            return canvasProperties.centerPx.y - value * canvasProperties.axisLengthPx;
         }
         return 0;
     }
@@ -139,60 +139,37 @@ export function decodeData(data: GraphSketcherState, canvasProperties: CanvasPro
 // TODO 'e' is probably a mouse event of some sort
 export function detect(e: MouseEvent, x: number, y: number) {
     const mousePosition = getMousePt(e);
-    return (getDist(mousePosition, createPoint(x, y)) < 5);
+    return (getDist(mousePosition, new Point(x, y)) < 5);
 }
 
 export function getMousePt(e: MouseEvent | Touch) {
     const x = e.clientX + (window.Touch && e instanceof Touch ? 5 : 0);
     const y = e.clientY + (window.Touch && e instanceof Touch ? 5 : 0);
-    return createPoint(x, y);
+    return new Point(x, y);
 }
 
-export function createPoint(x: number, y: number) {
-    const obj = [x, y];
-    return obj;
-}
+export function recalculateCurveProperties(curve: Curve, canvasProperties: CanvasProperties) {
+    // note: this does not set ALL properties, only those that might reasonably change when the curve is modified
+    curve.minX = curve.pts.reduce((min, p) => Math.min(min, p.x), curve.pts[0].x);
+    curve.maxX = curve.pts.reduce((max, p) => Math.max(max, p.x), curve.pts[0].x);
+    curve.minY = curve.pts.reduce((min, p) => Math.min(min, p.y), curve.pts[0].y);
+    curve.maxY = curve.pts.reduce((max, p) => Math.max(max, p.y), curve.pts[0].y);
 
-export function setCurveProperties(curve: Curve, pts: Point[], selectedLineType: LineType, canvasProperties: CanvasProperties, colorIdx: number) {
-    curve.pts = pts;
-
-    let minX = pts[0][0];
-    let maxX = pts[0][0];
-    let minY = pts[0][1];
-    let maxY = pts[0][1];
-    for (let i = 1; i < pts.length; i++) {
-        minX = Math.min(pts[i][0], minX);
-        maxX = Math.max(pts[i][0], maxX);
-        minY = Math.min(pts[i][1], minY);
-        maxY = Math.max(pts[i][1], maxY);
-    }
-    curve.minX = minX;
-    curve.maxX = maxX;
-    curve.minY = minY;
-    curve.maxY = maxY;
-
-    curve.interX = findInterceptX(canvasProperties, pts);
-    curve.interY = findInterceptY(canvasProperties, pts);
-    if (selectedLineType === LineType.BEZIER) {
-        curve.maxima = findTurnPts(pts, 'maxima');
-        curve.minima = findTurnPts(pts, 'minima');
-    } else {
-        curve.maxima = [];
-        curve.minima = [];
-    }
-    curve.colorIdx = colorIdx;
-}
+    curve.interX = findInterceptX(canvasProperties, curve.pts);
+    curve.interY = findInterceptY(canvasProperties, curve.pts);
+    curve.maxima = findTurnPts(curve.pts, 'maxima');
+    curve.minima = findTurnPts(curve.pts, 'minima');}
 
 export function linearLineStyle(pts: Point[]) {
-    pts.sort(function(a, b){return a[0] - b[0];});
+    pts.sort(function(a, b){return a.x - b.x;});
     const increment = 1/numOfPts;
     const linearPoints = [];
-    const x_diff = pts[1][0]-pts[0][0];
-    const y_diff = pts[1][1]-pts[0][1];
+    const x_diff = pts[1].x-pts[0].x;
+    const y_diff = pts[1].y-pts[0].y;
     for (let currentPoint = 0; currentPoint < numOfPts; currentPoint += 1) {
-        const x_co = pts[0][0] + (currentPoint*increment*x_diff);
-        const y_co = pts[0][1] + (currentPoint*increment*y_diff);
-        linearPoints.push(createPoint(x_co,y_co));
+        const x_co = pts[0].x + (currentPoint*increment*x_diff);
+        const y_co = pts[0].y + (currentPoint*increment*y_diff);
+        linearPoints.push(new Point(x_co,y_co));
     }
     return linearPoints;
 }
@@ -252,10 +229,10 @@ export function bezierLineStyle(pts: Point[]) {
             tmp1 = Math.pow(u, currentIndex);
             tmp2 = Math.pow(1 - u, drawnNumberOfPoints - currentIndex);
             tmp3 = comb[currentIndex] * tmp1 * tmp2;
-            sx += tmp3 * pts[currentIndex][0];
-            sy += tmp3 * pts[currentIndex][1];
+            sx += tmp3 * pts[currentIndex].x;
+            sy += tmp3 * pts[currentIndex].y;
         }
-        bezier.push(createPoint(sx, sy));
+        bezier.push(new Point(sx, sy));
     }
     bezier.push(pts[pts.length - 1]);
     return bezier;
@@ -324,10 +301,10 @@ export function findOutermostPts(pts: Point[]): Point[] {
     let maxY = pts[0];
 
     for (let i = 1; i < pts.length; i++) {
-        if (pts[i][0] < minX[0]) minX = pts[i];
-        if (pts[i][0] > maxX[0]) maxX = pts[i];
-        if (pts[i][1] < minY[1]) minY = pts[i];
-        if (pts[i][1] > maxY[1]) maxY = pts[i];
+        if (pts[i].x < minX.x) minX = pts[i];
+        if (pts[i].x > maxX.x) maxX = pts[i];
+        if (pts[i].y < minY.y) minY = pts[i];
+        if (pts[i].y > maxY.y) maxY = pts[i];
     }
 
     return [minX, maxX, minY, maxY];
@@ -338,8 +315,8 @@ export function findEndPts(pts: Point[]): Point[] {
 
     const ends = [];
 
-    ends.push(createPoint(pts[0][0], pts[0][1]));
-    ends.push(createPoint(pts[pts.length - 1][0], pts[pts.length - 1][1]));
+    ends.push(new Point(pts[0].x, pts[0].y));
+    ends.push(new Point(pts[pts.length - 1].x, pts[pts.length - 1].y));
 
     return ends;
 }
@@ -349,19 +326,19 @@ export function findInterceptX(canvasProperties: CanvasProperties, pts: Point[])
 
     const intercepts = [];
 
-    if (pts[0][1] == canvasProperties.centerPx[1]) intercepts.push(pts[0]);
+    if (pts[0].y == canvasProperties.centerPx.y) intercepts.push(pts[0]);
     for (let i = 1; i < pts.length; i++) {
-        if (pts[i][1] == canvasProperties.centerPx[1]) {
-            intercepts.push(createPoint(pts[i][0], pts[i][1]));
+        if (pts[i].y == canvasProperties.centerPx.y) {
+            intercepts.push(new Point(pts[i].x, pts[i].y));
             continue;
         }
 
-        if ((pts[i-1][1] - canvasProperties.centerPx[1]) * (pts[i][1] - canvasProperties.centerPx[1]) < 0 && (pts[i-1][1] - pts[i][1] < Math.abs(200))) {
-            const dx = pts[i][0] - pts[i-1][0];
-            const dy = pts[i][1] - pts[i-1][1];
+        if ((pts[i-1].y - canvasProperties.centerPx.y) * (pts[i].y - canvasProperties.centerPx.y) < 0 && (pts[i-1].y - pts[i].y < Math.abs(200))) {
+            const dx = pts[i].x - pts[i-1].x;
+            const dy = pts[i].y - pts[i-1].y;
             const grad = dy/dx;
-            const esti = pts[i-1][0] + (1 / grad) * (canvasProperties.centerPx[1] - pts[i-1][1]);
-            intercepts.push(createPoint(esti, canvasProperties.centerPx[1]));
+            const esti = pts[i-1].x + (1 / grad) * (canvasProperties.centerPx.y - pts[i-1].y);
+            intercepts.push(new Point(esti, canvasProperties.centerPx.y));
         }
     }
 
@@ -373,19 +350,19 @@ export function findInterceptY(canvasProperties: CanvasProperties, pts: Point[])
 
     const intercepts = [];
 
-    if (pts[0][0] == canvasProperties.centerPx[0]) intercepts.push(pts[0]);
+    if (pts[0].x == canvasProperties.centerPx.x) intercepts.push(pts[0]);
     for (let i = 1; i < pts.length; i++) {
-        if (pts[i][0] == canvasProperties.centerPx[0]) {
-            intercepts.push(createPoint(pts[i][0], pts[i][1]));
+        if (pts[i].x == canvasProperties.centerPx.x) {
+            intercepts.push(new Point(pts[i].x, pts[i].y));
             continue;
         }
 
-        if ((pts[i-1][0] - canvasProperties.centerPx[0]) * (pts[i][0] - canvasProperties.centerPx[0]) < 0 && (pts[i-1][0] - pts[i][0] < Math.abs(200))) {
-            const dx = pts[i][0] - pts[i-1][0];
-            const dy = pts[i][1] - pts[i-1][1];
+        if ((pts[i-1].x - canvasProperties.centerPx.x) * (pts[i].x - canvasProperties.centerPx.x) < 0 && (pts[i-1].x - pts[i].x < Math.abs(200))) {
+            const dx = pts[i].x - pts[i-1].x;
+            const dy = pts[i].y - pts[i-1].y;
             const grad = dy/dx;
-            const esti = pts[i-1][1] + grad * (canvasProperties.centerPx[0] - pts[i-1][0]);
-            intercepts.push(createPoint(canvasProperties.centerPx[0], esti));
+            const esti = pts[i-1].y + grad * (canvasProperties.centerPx.x - pts[i-1].x);
+            intercepts.push(new Point(canvasProperties.centerPx.x, esti));
         }
     }
 
@@ -406,14 +383,14 @@ export function findTurnPts(pts: Point[], mode: string, isClosed: boolean = fals
 
     if (isClosed) {
         for (let i = 0; i < pts.length-1; i++) {
-            if ((pts[i][1] < pts[mod(i-1, pts.length)][1] && pts[i][1] < pts[mod(i+1, pts.length)][1]) || (pts[i][1] > pts[mod(i-1, pts.length)][1] && pts[i][1] > pts[mod(i+1, pts.length)][1]) || (pts[i][1] == pts[mod(i-1, pts.length)][1])) {
-                potentialPts.push(createPoint(pts[i][0], pts[i][1]));
+            if ((pts[i].y < pts[mod(i-1, pts.length)].y && pts[i].y < pts[mod(i+1, pts.length)].y) || (pts[i].y > pts[mod(i-1, pts.length)].y && pts[i].y > pts[mod(i+1, pts.length)].y) || (pts[i].y == pts[mod(i-1, pts.length)].y)) {
+                potentialPts.push(new Point(pts[i].x, pts[i].y));
             }
         }
     } else {
         for (let i = CUTOFF; i < pts.length-1-CUTOFF; i++) {
-            if ((pts[i][1] < pts[i-1][1] && pts[i][1] < pts[i+1][1]) || (pts[i][1] > pts[i-1][1] && pts[i][1] > pts[i+1][1]) || (pts[i][1] == pts[i-1][1])) {
-                potentialPts.push(createPoint(pts[i][0], pts[i][1]));
+            if ((pts[i].y < pts[i-1].y && pts[i].y < pts[i+1].y) || (pts[i].y > pts[i-1].y && pts[i].y > pts[i+1].y) || (pts[i].y == pts[i-1].y)) {
+                potentialPts.push(new Point(pts[i].x, pts[i].y));
             }
         }
     }
@@ -424,16 +401,16 @@ export function findTurnPts(pts: Point[], mode: string, isClosed: boolean = fals
 
     for (let i = 0; i < statPts.length; i++) { 
         for (let j = 0; j < pts.length; j++) {
-            if (statPts[i][0] == pts[j][0]) {
+            if (statPts[i].x == pts[j].x) {
                 position = j;
             }
         }
         if (!isDefined(position)) continue;
-        if (statPts[i][1] < pts[mod(position-5, pts.length)][1] && statPts[i][1] < pts[mod(position+5, pts.length)][1]) {
+        if (statPts[i].y < pts[mod(position-5, pts.length)].y && statPts[i].y < pts[mod(position+5, pts.length)].y) {
             // if the point we have found is within 5 units of the previous point, only include one of them
             // if (pts.findIndex((v: Point) => _isEqual(statPts[i], v)) === 0) {
             pot_max.push(statPts[i]);
-        } else if (statPts[i][1] > pts[mod(position-5, pts.length)][1] && statPts[i][1] > pts[mod(position+5, pts.length)][1]) {
+        } else if (statPts[i].y > pts[mod(position-5, pts.length)].y && statPts[i].y > pts[mod(position+5, pts.length)].y) {
             pot_min.push(statPts[i]);
         }
     }
@@ -442,6 +419,39 @@ export function findTurnPts(pts: Point[], mode: string, isClosed: boolean = fals
     turnPts.sort(sortByPointOrder.bind(undefined, pts));
     
     return turnPts;
+}
+
+// importantPoints is a list of all points that will not move when any other important point is stretched.
+// This includes the outermost points, the maxima and minima (for x and y), and the endpoints.
+// If two important points are close together, they will be treated as one, with priority going to endpoints, then x-min/x-max, then outermost, then y-min/y-max.
+export function findImportantPoints(curve: Curve) {
+    const transposePoint = (pt: Point) => new Point(pt.y, pt.x);
+    const transposedSelectedCurvePts = curve.pts.map(transposePoint);
+    
+    const yMaxima = findTurnPts(transposedSelectedCurvePts, 'maxima', curve.isClosed).map(transposePoint);
+    const yMinima = findTurnPts(transposedSelectedCurvePts, 'minima', curve.isClosed).map(transposePoint);
+    const outermostPts = findOutermostPts(curve.pts);
+
+    const endPoints: Point[] = (!curve.isClosed ? findEndPts(curve.pts) : []);
+
+    // push all points from pts into arr that are not within GraphSketcher.IMPORTANT_POINT_DETECT_RADIUS of any point in arr
+    const pushWithDistanceCheck = (arr: Point[], pts: Point[]) => {
+        pts.forEach((pt) => {if (arr.every((v) => getDist(v, pt) > GraphSketcher.IMPORTANT_POINT_DETECT_RADIUS)) {
+            arr.push(pt);
+        }});
+    };
+
+    let importantPoints : Point[] = [];
+
+    for (const ptsList of [endPoints, curve.maxima, curve.minima, yMinima, yMaxima, outermostPts]) {
+        pushWithDistanceCheck(importantPoints, ptsList);
+    }
+
+    // remove duplicates
+    importantPoints = importantPoints.filter((v, i) => importantPoints.findIndex((w) => _isEqual(v, w)) === i);
+    importantPoints.sort(sortByPointOrder.bind(undefined, curve.pts));
+
+    return importantPoints;
 }
 
 
@@ -455,16 +465,16 @@ export function translateCurve(curve: Curve, dx: number, dy: number, canvasPrope
     curve.maxY += dy;
 
     for (let i = 0; i < pts.length; i++) {
-        pts[i][0] += dx;
-        pts[i][1] += dy;
+        pts[i].x += dx;
+        pts[i].y += dy;
     }
 
     function moveTurnPts(knots: Point[]) {
         for (let i = 0; i < knots.length; i++) {
             const knot = knots[i];
 
-            knot[0] += dx;
-            knot[1] += dy;
+            knot.x += dx;
+            knot.y += dy;
         }
     }
 
@@ -492,7 +502,7 @@ export function translateCurve(curve: Curve, dx: number, dy: number, canvasPrope
             //     }
 
             //     if (found) {
-            //         symbol.x = knot[0];
+            //         symbol.x = knot.x;
             //         symbol.y = knot.y;
             //         knot.symbol = symbol;
             //     } 
@@ -519,12 +529,12 @@ export function rotateCurve(curve: Curve, angle: number, center: Point) {
     const pts = curve.pts;
     
     function rotatePoint(point: Point, angle: number, center: Point) {
-        const x = point[0] - center[0];
-        const y = point[1] - center[1];
+        const x = point.x - center.x;
+        const y = point.y - center.y;
         const cos = Math.cos(angle);
         const sin = Math.sin(angle);
-        point[0] = x * cos - y * sin + center[0];
-        point[1] = x * sin + y * cos + center[1];
+        point.x = x * cos - y * sin + center.x;
+        point.y = x * sin + y * cos + center.y;
     }
 
     pts.map(pt => rotatePoint(pt, angle, center));
@@ -565,22 +575,22 @@ export function stretchTurningPoint(importantPoints: Point[], e: MouseEvent | To
     const YBUFFER = 15;
     // when dragging, we shouldn't be able to move the turning point past the next/prev turning point in either axis
     if (prevImportant && nextImportant) {
-        const leftImportant = (prevImportant[0] < nextImportant[0]) ? prevImportant : nextImportant;
-        const rightImportant = (prevImportant[0] < nextImportant[0]) ? nextImportant : prevImportant;
-        withinXBoundary = (rightImportant[0] - mousePosition[0]) > XBUFFER && (mousePosition[0] - leftImportant[0]) > XBUFFER;
-        withinYBoundary = (isMaxima && ((rightImportant[1] - mousePosition[1]) > YBUFFER && (leftImportant[1] - mousePosition[1]) > YBUFFER)) || (!isMaxima && ((mousePosition[1] - rightImportant[1]) > YBUFFER && (mousePosition[1] - leftImportant[1]) > YBUFFER));
+        const leftImportant = (prevImportant.x < nextImportant.x) ? prevImportant : nextImportant;
+        const rightImportant = (prevImportant.x < nextImportant.x) ? nextImportant : prevImportant;
+        withinXBoundary = (rightImportant.x - mousePosition.x) > XBUFFER && (mousePosition.x - leftImportant.x) > XBUFFER;
+        withinYBoundary = (isMaxima && ((rightImportant.y - mousePosition.y) > YBUFFER && (leftImportant.y - mousePosition.y) > YBUFFER)) || (!isMaxima && ((mousePosition.y - rightImportant.y) > YBUFFER && (mousePosition.y - leftImportant.y) > YBUFFER));
     } else {
         const definedImportant = prevImportant ?? nextImportant;
         if (!isDefined(definedImportant)) return;
-        if (definedImportant[0] - currImportant[0] > 0) {
-            withinXBoundary = (definedImportant[0] - mousePosition[0]) > XBUFFER;
+        if (definedImportant.x - currImportant.x > 0) {
+            withinXBoundary = (definedImportant.x - mousePosition.x) > XBUFFER;
         } else {
-            withinXBoundary = (mousePosition[0] - definedImportant[0]) > XBUFFER;
+            withinXBoundary = (mousePosition.x - definedImportant.x) > XBUFFER;
         }
-        if (definedImportant[1] - currImportant[1] > 0) {
-            withinYBoundary = (definedImportant[1] - mousePosition[1]) > YBUFFER;
+        if (definedImportant.y - currImportant.y > 0) {
+            withinYBoundary = (definedImportant.y - mousePosition.y) > YBUFFER;
         } else {
-            withinYBoundary = (mousePosition[1] - definedImportant[1]) > YBUFFER;
+            withinYBoundary = (mousePosition.y - definedImportant.y) > YBUFFER;
         }
     }
 
@@ -593,9 +603,9 @@ export function stretchTurningPoint(importantPoints: Point[], e: MouseEvent | To
         const rightStaticPoints = new Array<Point>();
 
         if (!withinXBoundary) {
-            mousePosition[0] = currImportant[0];
+            mousePosition.x = currImportant.x;
         } else if (!withinYBoundary) {
-            mousePosition[1] = currImportant[1];
+            mousePosition.y = currImportant.y;
         }
 
         let currentSectionState = (prevImportant) ? 0 : 1;
@@ -637,18 +647,18 @@ export function stretchTurningPoint(importantPoints: Point[], e: MouseEvent | To
 
         // we have now split the curve into leftStaticPoints and rightStaticPoints, plus leftStretchedCurve and rightStretchedCurve
         if (isDefined(prevImportant)) {
-            const lorx = currImportant[0] - prevImportant[0];
-            const lory = currImportant[1] - prevImportant[1];
-            const lnrx = mousePosition[0] - prevImportant[0];
-            const lnry = mousePosition[1] - prevImportant[1];
-            stretchCurve(leftStretchedCurve, lorx, lory, lnrx, lnry, prevImportant[0], prevImportant[1]);    
+            const lorx = currImportant.x - prevImportant.x;
+            const lory = currImportant.y - prevImportant.y;
+            const lnrx = mousePosition.x - prevImportant.x;
+            const lnry = mousePosition.y - prevImportant.y;
+            stretchCurve(leftStretchedCurve, lorx, lory, lnrx, lnry, prevImportant.x, prevImportant.y);    
         }
         if (isDefined(nextImportant)) {
-            const rorx = nextImportant[0] - currImportant[0];
-            const rory = currImportant[1] - nextImportant[1];
-            const rnrx = nextImportant[0] - mousePosition[0];
-            const rnry = mousePosition[1] - nextImportant[1];
-            stretchCurve(rightStretchedCurve, rorx, rory, rnrx, rnry, nextImportant[0], nextImportant[1]);
+            const rorx = nextImportant.x - currImportant.x;
+            const rory = currImportant.y - nextImportant.y;
+            const rnrx = nextImportant.x - mousePosition.x;
+            const rnry = mousePosition.y - nextImportant.y;
+            stretchCurve(rightStretchedCurve, rorx, rory, rnrx, rnry, nextImportant.x, nextImportant.y);
         }
 
         currImportant = mousePosition;
@@ -658,7 +668,7 @@ export function stretchTurningPoint(importantPoints: Point[], e: MouseEvent | To
         selectedCurve.pts.push(...rightStretchedCurve.pts);
         selectedCurve.pts.push(...rightStaticPoints);
 
-        setCurveProperties(selectedCurve, selectedCurve.pts, LineType.BEZIER, canvasProperties, selectedCurve.colorIdx);
+        recalculateCurveProperties(selectedCurve, canvasProperties);
     }
     return selectedCurve;
 }
@@ -666,10 +676,10 @@ export function stretchTurningPoint(importantPoints: Point[], e: MouseEvent | To
 export function stretchCurve(c: Curve, orx: number, ory: number, nrx: number, nry: number, baseX: number, baseY: number) {
 
     function stretch(pt: Point) {
-        const nx = (pt[0] - baseX) / orx;
-        const ny = (pt[1] - baseY) / ory;
-        pt[0] = nx * nrx + baseX;
-        pt[1] = ny * nry + baseY;
+        const nx = (pt.x - baseX) / orx;
+        const ny = (pt.y - baseY) / ory;
+        pt.x = nx * nrx + baseX;
+        pt.y = ny * nry + baseY;
     }
     // stretch each point
     c.pts.forEach(stretch);
