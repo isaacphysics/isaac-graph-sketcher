@@ -75,6 +75,7 @@ export class GraphSketcher {
     public  checkPointsRedo: Checkpoint[] = [];
 
     public static CURVE_LIMIT = 3;
+    public static MERGE_STATIONARY_POINT_RADIUS = 5;
     public static CLIP_RADIUS = 15;
     public static MOUSE_DETECT_RADIUS = 20;
     public static IMPORTANT_POINT_DETECT_RADIUS = 30;
@@ -94,13 +95,8 @@ export class GraphSketcher {
     // for moving and stretching curve
     private movedCurveIdx?: number;
     private stretchMode?: string;
-    private isMaxima?: boolean;
     private outOfBoundsCurvePoint?: Point;
     private rotationCenter?: Point;
-
-    // for moving symbols
-    private movedSymbol?: null; // TODO: WTF is this?
-    private symbolType?: string;
 
     private _oldState: GraphSketcherState;
     private _state: GraphSketcherState;
@@ -466,9 +462,6 @@ export class GraphSketcher {
         this.isMouseDragged = false;
         this.action = Action.NO_ACTION;
 
-        this.movedSymbol = undefined;
-        this.symbolType = undefined;
-
         this.drawnPts = [];
 
         switch (this.colorSelect?.value) {
@@ -556,19 +549,15 @@ export class GraphSketcher {
 
         if (isDefined(this._state.curves) && this._state.curves.length > 0) {
             for (let i = 0; i < this._state.curves.length; i++) {
-                const maxima = this._state.curves[i].maxima;
-                const minima = this._state.curves[i].minima;
-                const draggablePoints = minima.concat(maxima, GraphUtils.findEndPts(this._state.curves[i].pts));
-                draggablePoints.sort(GraphUtils.sortByPointOrder.bind(this, this._state.curves[i].pts));
+                const movablePoints = GraphUtils.findMovablePoints(this._state.curves[i]);
 
-                for (let j = 0; j < draggablePoints.length; j++) {
-                    const knot = draggablePoints[j];
-                    if (GraphUtils.getDist(mousePosition, knot) < GraphSketcher.MOUSE_DETECT_RADIUS + 10) {
+                for (let j = 0; j < movablePoints.length; j++) {
+                    const knot = movablePoints[j];
+                    if (GraphUtils.getDist(mousePosition, knot) < GraphSketcher.MOUSE_DETECT_RADIUS + 10) { //TODO: why is this +10
                         this.clickedCurve = i;
                         this.action = Action.STRETCH_POINT;
                         this.clickedKnotId = j;
                         this.prevMousePt = mousePosition;
-                        this.isMaxima = maxima.includes(knot);
                         return;
                     }
                 }
@@ -579,7 +568,6 @@ export class GraphSketcher {
                         this.clickedCurveIdx = i;
                         this.movedCurveIdx = i;
                         this.action = Action.MOVE_CURVE;
-                        this.clickedKnot = undefined;
                         this.prevMousePt = mousePosition;
                         return;
                     }
@@ -612,14 +600,13 @@ export class GraphSketcher {
         const mousePosition = GraphUtils.getMousePt(e);
         this.releasePt = mousePosition;
 
-        if (this.action === Action.STRETCH_POINT && isDefined(this.clickedCurve) && isDefined(this._state.curves)) {
-            const selectedCurve = this._state.curves[this.clickedCurve];
-            
-            const importantPoints = GraphUtils.findImportantPoints(selectedCurve);
+        if (this.action === Action.STRETCH_POINT && isDefined(this.clickedCurveIdx) && isDefined(this._state.curves)) {
+            const selectedCurve = this._state.curves[this.clickedCurveIdx];
 
-            // maxima and minima are treated in slightly different ways
-            if (isDefined(this.isMaxima)) {
-                const curve = GraphUtils.stretchTurningPoint(importantPoints, e, selectedCurve, this.isMaxima, this.clickedKnotId, this.prevMousePt, this.canvasProperties);
+            if (isDefined(this.clickedKnotIdx)) {
+                const movablePoints = GraphUtils.findMovablePoints(selectedCurve); // these come sorted in point order
+                const movedPoint = movablePoints[this.clickedKnotIdx];
+                const curve = GraphUtils.stretchTurningPoint(selectedCurve, movedPoint, mousePosition, this.canvasProperties);
                 if (isDefined(curve)) {
                     this._state.curves[this.clickedCurve] = curve;
                 }
@@ -644,7 +631,7 @@ export class GraphSketcher {
             const startingAngle = GraphUtils.getAngle(this.rotationCenter, this.prevMousePt);
             const currentAngle = GraphUtils.getAngle(this.rotationCenter, mousePosition);
 
-            GraphUtils.rotateCurve(curve, currentAngle - startingAngle, this.rotationCenter);
+            GraphUtils.rotateCurve(curve, currentAngle - startingAngle, this.rotationCenter, this.canvasProperties);
             
             this.prevMousePt = mousePosition;
             
@@ -652,7 +639,6 @@ export class GraphSketcher {
                 this.hiddenKnotCurveIdxs.push(this.clickedCurveIdx);
             }
             
-            GraphUtils.recalculateCurveProperties(curve, this.canvasProperties);
             this.outOfBoundsCurvePoint = this.isCurveOutsidePlot(this.clickedCurveIdx) ? this.getAveragePoint(this._state.curves[this.clickedCurveIdx].pts) : undefined;
             this.reDraw();
         } else if (this.action === Action.STRETCH_CURVE && isDefined(this.clickedCurveIdx) && isDefined(this._state.curves)) {
@@ -872,7 +858,6 @@ export class GraphSketcher {
                 this._state.curves.splice(this.clickedCurveIdx, 1);
                 this.clickedCurveIdx = undefined;
                 this.outOfBoundsCurvePoint = undefined;
-                this.reDraw();
             } else {
                 const curve = this._state.curves[this.clickedCurveIdx];
                 GraphUtils.recalculateCurveProperties(curve, this.canvasProperties);
