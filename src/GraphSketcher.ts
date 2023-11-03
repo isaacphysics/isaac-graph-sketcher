@@ -862,6 +862,8 @@ export class GraphSketcher {
                 const curve = this._state.curves[this.clickedCurveIdx];
                 GraphUtils.recalculateCurveProperties(curve, this.canvasProperties);
             }
+            this.hiddenKnotCurveIdxs.pop();
+            this.reDraw();
         } else if (this.action === Action.DRAW_CURVE) {
 
             if (isDefined(this._state.curves) && this._state.curves.length < GraphSketcher.CURVE_LIMIT){
