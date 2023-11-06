@@ -549,8 +549,12 @@ export function rotateCurve(curve: Curve, angle: number, center: Point, canvasPr
 export function stretchTurningPoint(selectedCurve: Curve, movedPoint: Point, mousePosition: Point, canvasProperties: CanvasProperties) {
     
     let importantPoints = findImportantPoints(selectedCurve);
-    let {prevImportant, nextImportant, prevPrevImportant} = calculateNearbyImportantPoints(selectedCurve, importantPoints, movedPoint);
+    
+    const nearbyImportants = calculateNearbyImportantPoints(selectedCurve, importantPoints, movedPoint);
+    const prevPrevImportant = nearbyImportants.prevPrevImportant;
+    let prevImportant = nearbyImportants.prevImportant;
     let currImportant = movedPoint;
+    let nextImportant = nearbyImportants.nextImportant;
     
     let withinXBoundary = false;
     let withinYBoundary = false;
