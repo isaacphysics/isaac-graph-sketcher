@@ -358,6 +358,11 @@ export class GraphSketcher {
         return this.checkPointsRedo.length > 0;
     };
 
+    public setSlopVisible = (visible: boolean) => {
+        this.graphView.setSlopVisible(visible);
+        this.reDraw();
+    };
+
     // Check if movement to new position is over an actionable object, so can render appropriately
     private mouseMoved = (e: MouseEvent) => {
         if (this.previewMode) return;
@@ -387,14 +392,6 @@ export class GraphSketcher {
                 //this.reDraw();  // FIXME why was this here in the first place
             }
         }
-
-        const makeDiamond = (x: number, y: number, w: number) => {
-            this.p.push();
-            this.p.translate(x, y);
-            this.p.rotate(this.p.QUARTER_PI);
-            this.p.square(0, 0, w);
-            this.p.pop();
-        };
 
         // stretch box
         if (isDefined(this.clickedCurveIdx) && isDefined(this._state.curves)) {
@@ -437,13 +434,13 @@ export class GraphSketcher {
             } else if (detect(c.minX - 16, c.minY - 16) || detect(c.maxX + 16, c.minY - 16) || detect(c.minX - 16, c.maxY + 16) || detect(c.maxX + 16, c.maxY + 16)) {
                 this.p.cursor(this.p.MOVE);
                 if (detect(c.minX - 16, c.minY - 16)) {
-                    makeDiamond(c.minX - 16, c.minY - 16, 4);
+                    this.graphView.makeDiamond(c.minX - 16, c.minY - 16, 4);
                 } else if (detect(c.maxX + 16, c.minY - 16)) {
-                    makeDiamond(c.maxX + 16, c.minY - 16, 4);
+                    this.graphView.makeDiamond(c.maxX + 16, c.minY - 16, 4);
                 } else if (detect(c.minX - 16, c.maxY + 16)) {
-                    makeDiamond(c.minX - 16, c.maxY + 16, 4);
+                    this.graphView.makeDiamond(c.minX - 16, c.maxY + 16, 4);
                 } else {
-                    makeDiamond(c.maxX + 16, c.maxY + 16, 4);
+                    this.graphView.makeDiamond(c.maxX + 16, c.maxY + 16, 4);
                 }
             } else if (mousePosition.x >= c.minX && mousePosition.x <= c.maxX && mousePosition.y >= c.minY && mousePosition.y <= c.maxY) {
                 this.graphView.drawStretchBox(this.clickedCurveIdx, this._state.curves);

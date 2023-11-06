@@ -18,6 +18,10 @@ export default class GraphView {
     private canvasProperties: CanvasProperties;
     private backgroundGraphic: p5.Graphics;
 
+    private AXIS_SLOP: number;
+    private ORIGIN_SLOP: number;
+    private slopVisible = false;
+
     private DOT_LINE_COLOR = [123];
     private DEFAULT_KNOT_COLOR = [77,77,77];
 
@@ -32,6 +36,11 @@ export default class GraphView {
     constructor(p: p5, canvasProperties: CanvasProperties) {
         this.p = p;
         this.PADDING = 0.025 * canvasProperties.axisLengthPx;
+
+        // these values should be synced with those in IsaacGraphSketcherSettings.java in the API
+        this.AXIS_SLOP = 0.005 * canvasProperties.axisLengthPx;
+        this.ORIGIN_SLOP = 0.01 * canvasProperties.axisLengthPx;
+
         this.canvasProperties = canvasProperties;
         this.backgroundGraphic = this.p.createGraphics(canvasProperties.widthPx, canvasProperties.heightPx);
         this.refreshBackground();
@@ -191,7 +200,7 @@ export default class GraphView {
 
     makeDiamond(x: number, y: number, w: number) {
         this.p.push();
-        this.p.translate(x, y);
+        this.p.translate(x, y - w/Math.SQRT2);
         this.p.rotate(this.p.QUARTER_PI);
         this.p.square(0, 0, w);
         this.p.pop();
@@ -340,6 +349,22 @@ export default class GraphView {
         this.drawLabel();
     }
 
+    public setSlopVisible = (visible: boolean) => {
+        this.slopVisible = visible;
+    };
+
+    drawSlop(canvasProperties: CanvasProperties) {
+        this.p.push();
+        this.p.noStroke();
+        this.p.fill(183, 204, 229, 128);
+        this.p.rect(0, canvasProperties.centerPx.y - this.AXIS_SLOP, canvasProperties.widthPx, 2 * this.AXIS_SLOP);
+        this.p.fill(183, 211, 170, 128);
+        this.p.rect(canvasProperties.centerPx.x - this.AXIS_SLOP, 0, 2 * this.AXIS_SLOP, canvasProperties.heightPx);
+        this.p.fill(229, 190, 183, 128);
+        this.makeDiamond(canvasProperties.centerPx.x, canvasProperties.centerPx.y, this.ORIGIN_SLOP * Math.sqrt(2));
+        this.p.pop();
+    }
+
     drawBoundaries(canvasProperties: CanvasProperties) {
         this.p.push();
         this.p.noStroke();
@@ -369,6 +394,9 @@ export default class GraphView {
             this.refreshBackground();
         }
         this.p.image(this.backgroundGraphic, 0, 0);
+        if (this.slopVisible) {
+            this.drawSlop(canvasProperties);
+        }
     }
 
     drawCorner(stretchMode: string, c: Curve) {
