@@ -354,13 +354,15 @@ export default class GraphView {
     };
 
     drawSlop(canvasProperties: CanvasProperties) {
+        const width = canvasProperties.plotEndPx.x - canvasProperties.plotStartPx.x;
+        const height = canvasProperties.plotEndPx.y - canvasProperties.plotStartPx.y;
         this.p.push();
         this.p.noStroke();
         this.p.fill(183, 204, 229, 128);
-        this.p.rect(0, canvasProperties.centerPx.y - this.AXIS_SLOP, canvasProperties.widthPx, 2 * this.AXIS_SLOP);
+        this.p.rect(canvasProperties.plotStartPx.x, canvasProperties.centerPx.y - this.AXIS_SLOP, width, 2 * this.AXIS_SLOP);
         this.p.fill(183, 211, 170, 128);
-        this.p.rect(canvasProperties.centerPx.x - this.AXIS_SLOP, 0, 2 * this.AXIS_SLOP, canvasProperties.heightPx);
-        this.p.fill(229, 190, 183, 128);
+        this.p.rect(canvasProperties.centerPx.x - this.AXIS_SLOP, canvasProperties.plotStartPx.y, 2 * this.AXIS_SLOP, height);
+        this.p.fill(229, 190, 183, 192);
         this.makeDiamond(canvasProperties.centerPx.x, canvasProperties.centerPx.y, this.ORIGIN_SLOP * Math.sqrt(2));
         this.p.pop();
     }
