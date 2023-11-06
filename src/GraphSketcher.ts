@@ -165,6 +165,8 @@ export class GraphSketcher {
         this.allowMultiValuedFunctions = options.allowMultiValuedFunctions ?? false;
         this._state = GraphUtils.decodeData({ curves: options.initialCurves ?? [], canvasWidth: width, canvasHeight: height }, this.canvasProperties);
         this._oldState = _cloneDeep(this._state);
+
+        addEventListener("resize", () => GraphSketcher.getCanvasPropertiesForResolution(window.innerHeight, window.innerWidth));
     }
 
     // run in the beginning by p5 library
