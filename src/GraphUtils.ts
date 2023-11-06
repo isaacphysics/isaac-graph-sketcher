@@ -105,6 +105,7 @@ export function decodeData(data: GraphSketcherState, canvasProperties: CanvasPro
         if (dimension == Dimension.X) {
             return value * canvasProperties.axisLengthPx + canvasProperties.centerPx.x;
         } else if (dimension == Dimension.Y) {
+            // denormalising the Y coordinate multiplies by -1 to account for flipped y axis
             return canvasProperties.centerPx.y - value * canvasProperties.axisLengthPx;
         }
         return 0;
@@ -118,9 +119,8 @@ export function decodeData(data: GraphSketcherState, canvasProperties: CanvasPro
         
         curve.minX = denormalise(c.minX, Dimension.X);
         curve.maxX = denormalise(c.maxX, Dimension.X);
-        // denormalising the Y coordinate multiplies by -1, so max becomes min and vice versa
-        curve.minY = denormalise(c.maxY, Dimension.Y);
-        curve.maxY = denormalise(c.minY, Dimension.Y);
+        curve.minY = denormalise(c.minY, Dimension.Y);
+        curve.maxY = denormalise(c.maxY, Dimension.Y);
         
         curve.interX = c.interX.map((point: Point) => denormalisePoint(point));
         curve.interY = c.interY.map((point: Point) => denormalisePoint(point));
