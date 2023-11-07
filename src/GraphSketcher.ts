@@ -13,6 +13,24 @@ export class Point {
         this.x = x;
         this.y = y;
     }
+
+    public toArray = (): number[] => {
+        return [this.x, this.y];
+    };
+}
+
+export class ExternalCurve {
+    pts: number[][] = [];
+    minX: number = 0;
+    maxX: number = 0;
+    minY: number = 0;
+    maxY: number = 0;
+    interX: number[][] = [];
+    interY: number[][] = [];
+    maxima: number[][] = [];
+    minima: number[][] = [];
+    colorIdx: number = -1;
+    isClosed: boolean = false;
 }
 export class Curve {
     pts: Point[] = [];
@@ -55,6 +73,7 @@ enum Action {
 export enum LineType { BEZIER, LINEAR }
 
 export interface GraphSketcherState { canvasWidth: number; canvasHeight: number; curves?: Curve[] }
+export interface GraphSketcherExternalState { canvasWidth: number; canvasHeight: number; curves?: ExternalCurve[] }
 
 interface Checkpoint {
     curvesJSON?: string;
@@ -166,6 +185,56 @@ export class GraphSketcher {
         this._state = GraphUtils.decodeData({ curves: options.initialCurves ?? [], canvasWidth: width, canvasHeight: height }, this.canvasProperties);
         this._oldState = _cloneDeep(this._state);
     }
+
+    private static toExternalCurve = (curve: Curve): ExternalCurve => {
+        const ec = new ExternalCurve();
+        ec.pts = curve.pts.map(p => p.toArray());
+        ec.interX = curve.interX.map(p => p.toArray());
+        ec.interY = curve.interY.map(p => p.toArray());
+        ec.maxima = curve.maxima.map(p => p.toArray());
+        ec.minima = curve.minima.map(p => p.toArray());
+        ec.minX = curve.minX;
+        ec.maxX = curve.maxX;
+        ec.minY = curve.minY;
+        ec.maxY = curve.maxY;
+        ec.colorIdx = curve.colorIdx;
+        ec.isClosed = curve.isClosed;
+        return ec;
+    };
+
+    private static toInternalCurve = (curve: ExternalCurve): Curve => {
+        const ic = new Curve();
+        ic.pts = curve.pts.map(p => new Point(p[0], p[1]));
+        ic.interX = curve.interX.map(p => new Point(p[0], p[1]));
+        ic.interY = curve.interY.map(p => new Point(p[0], p[1]));
+        ic.maxima = curve.maxima.map(p => new Point(p[0], p[1]));
+        ic.minima = curve.minima.map(p => new Point(p[0], p[1]));
+        ic.minX = curve.minX;
+        ic.maxX = curve.maxX;
+        ic.minY = curve.minY;
+        ic.maxY = curve.maxY;
+        ic.colorIdx = curve.colorIdx;
+        ic.isClosed = curve.isClosed;
+        return ic;
+    };
+
+    public static toExternalState = (state: GraphSketcherState): GraphSketcherExternalState => {
+        const externState: GraphSketcherExternalState = {canvasHeight: state.canvasHeight, canvasWidth: state.canvasWidth, curves: []};
+        state.curves?.forEach((c) => {
+            const s = this.toExternalCurve(c);
+            externState.curves?.push(s);
+        });
+        return externState;
+    };
+
+    public static toInternalState = (state: GraphSketcherExternalState): GraphSketcherState => {
+        const internalState: GraphSketcherState = {canvasHeight: state.canvasHeight, canvasWidth: state.canvasWidth, curves: []};
+        state.curves?.forEach((c) => {
+            const s = this.toInternalCurve(c);
+            internalState.curves?.push(s);
+        });
+        return internalState;
+    };
 
     // run in the beginning by p5 library
     private setup = () => {
