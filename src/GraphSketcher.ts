@@ -95,7 +95,7 @@ export class GraphSketcher {
 
     public static CURVE_LIMIT = 3;
     public static CLIP_RADIUS = 15;
-    public static MOUSE_DETECT_RADIUS = 20;
+    public static MOUSE_DETECT_RADIUS = 10;
     public static IMPORTANT_POINT_DETECT_RADIUS = 30;
     public static REQUIRED_CURVE_ON_SCREEN_RATIO = 0.50; // 50% of a curves points must be on screen or it will be deleted
 
