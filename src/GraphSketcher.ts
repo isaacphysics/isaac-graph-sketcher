@@ -14,6 +14,20 @@ export class Point {
         this.y = y;
     }
 }
+
+export class ExternalCurve {
+    pts: number[][] = [];
+    minX: number = 0;
+    maxX: number = 0;
+    minY: number = 0;
+    maxY: number = 0;
+    interX: number[][] = [];
+    interY: number[][] = [];
+    maxima: number[][] = [];
+    minima: number[][] = [];
+    colorIdx: number = -1;
+    isClosed: boolean = false;
+}
 export class Curve {
     pts: Point[] = [];
     minX: number = 0;
@@ -55,6 +69,7 @@ enum Action {
 export enum LineType { BEZIER, LINEAR }
 
 export interface GraphSketcherState { canvasWidth: number; canvasHeight: number; curves?: Curve[] }
+export interface GraphSketcherExternalState { canvasWidth: number; canvasHeight: number; curves?: ExternalCurve[] }
 
 interface Checkpoint {
     curvesJSON?: string;
