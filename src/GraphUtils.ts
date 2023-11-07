@@ -1,5 +1,9 @@
 import {CanvasProperties, Curve, Dimension, GraphSketcher, GraphSketcherState, Point} from "./GraphSketcher";
-import _isEqual from 'lodash/isEqual';
+
+export function pointsEqual(p?: Point, q?: Point) {
+    if (!isDefined(p) || !isDefined(q)) return false;
+    return p.x === q.x && p.y === q.y;
+}
 
 // undefined|null checker and type guard all-in-wonder.
 // Why is this not in Typescript?
@@ -448,7 +452,7 @@ export function findImportantPoints(curve: Curve) {
     }
 
     // remove duplicates
-    importantPoints = importantPoints.filter((v, i) => importantPoints.findIndex((w) => _isEqual(v, w)) === i);
+    importantPoints = importantPoints.filter((v, i) => importantPoints.findIndex((w) => pointsEqual(v, w)) === i);
     importantPoints.sort(sortByPointOrder.bind(undefined, curve.pts));
 
     return importantPoints;
@@ -523,7 +527,7 @@ export function translateCurve(curve: Curve, dx: number, dy: number, canvasPrope
 }
 
 
-export const sortByPointOrder = (pts: Point[], a: Point, b: Point) => pts.findIndex((v: Point) => _isEqual(a, v)) - pts.findIndex((v: Point) => _isEqual(b, v));
+export const sortByPointOrder = (pts: Point[], a: Point, b: Point) => pts.findIndex((v: Point) => pointsEqual(a, v)) - pts.findIndex((v: Point) => pointsEqual(b, v));
 
 export function rotateCurve(curve: Curve, angle: number, center: Point) {
     const pts = curve.pts;
@@ -556,7 +560,7 @@ export function stretchTurningPoint(importantPoints: Point[], e: MouseEvent | To
         if (!isDefined(importantPoints[i]) || !isDefined(currImportant)) {
             break;
         }
-        if (_isEqual(importantPoints[i], currImportant)) {
+        if (pointsEqual(importantPoints[i], currImportant)) {
             if (selectedCurve.isClosed) {
                 prevImportant = (importantPoints.length <= 1) ? undefined : importantPoints[mod(i - 1, importantPoints.length)]; 
                 nextImportant = (importantPoints.length <= 1) ? undefined : importantPoints[mod(i + 1, importantPoints.length)];
@@ -614,7 +618,7 @@ export function stretchTurningPoint(importantPoints: Point[], e: MouseEvent | To
         // and must be run after the switch if there is no later important point.
         // cases with both work with either position.
         const updateSectionState = (pt : Point) => {
-            if (_isEqual(pt, prevImportant) || _isEqual(pt, currImportant) || _isEqual(pt, nextImportant)) {
+            if (pointsEqual(pt, prevImportant) || pointsEqual(pt, currImportant) || pointsEqual(pt, nextImportant)) {
                 currentSectionState = (currentSectionState + 1) % 4;
             }
         };
