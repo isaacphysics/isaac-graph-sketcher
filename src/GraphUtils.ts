@@ -1,5 +1,9 @@
 import {CanvasProperties, Curve, Dimension, GraphSketcher, GraphSketcherState, Point} from "./GraphSketcher";
-import _isEqual from 'lodash/isEqual';
+
+export function pointsEqual(p?: Point, q?: Point) {
+    if (!isDefined(p) || !isDefined(q)) return false;
+    return p.x === q.x && p.y === q.y;
+}
 
 // undefined|null checker and type guard all-in-wonder.
 // Why is this not in Typescript?
@@ -105,6 +109,7 @@ export function decodeData(data: GraphSketcherState, canvasProperties: CanvasPro
         if (dimension == Dimension.X) {
             return value * canvasProperties.axisLengthPx + canvasProperties.centerPx.x;
         } else if (dimension == Dimension.Y) {
+            // denormalising the Y coordinate multiplies by -1 to account for flipped y axis
             return canvasProperties.centerPx.y - value * canvasProperties.axisLengthPx;
         }
         return 0;
@@ -118,9 +123,8 @@ export function decodeData(data: GraphSketcherState, canvasProperties: CanvasPro
         
         curve.minX = denormalise(c.minX, Dimension.X);
         curve.maxX = denormalise(c.maxX, Dimension.X);
-        // denormalising the Y coordinate multiplies by -1, so max becomes min and vice versa
-        curve.minY = denormalise(c.maxY, Dimension.Y);
-        curve.maxY = denormalise(c.minY, Dimension.Y);
+        curve.minY = denormalise(c.minY, Dimension.Y);
+        curve.maxY = denormalise(c.maxY, Dimension.Y);
         
         curve.interX = c.interX.map((point: Point) => denormalisePoint(point));
         curve.interY = c.interY.map((point: Point) => denormalisePoint(point));
@@ -484,7 +488,7 @@ export function findImportantPoints(curve: Curve) {
     }
 
     // remove duplicates
-    importantPoints = importantPoints.filter((v, i) => importantPoints.findIndex((w) => _isEqual(v, w)) === i);
+    importantPoints = importantPoints.filter((v, i) => importantPoints.findIndex((w) => pointsEqual(v, w)) === i);
     importantPoints.sort(sortByPointOrder.bind(undefined, curve.pts));
 
     return importantPoints;
@@ -498,7 +502,7 @@ function calculateNearbyImportantPoints(curve : Curve, importantPoints : Point[]
         if (!isDefined(importantPoints[i]) || !isDefined(currImportant)) {
             break;
         }
-        if (_isEqual(importantPoints[i], currImportant)) {
+        if (pointsEqual(importantPoints[i], currImportant)) {
             if (curve.isClosed) {
                 // closed curves *should* always have at least 4 important points (max/min for each axis)
                 prevPrevImportant = (importantPoints.length <= 1) ? undefined : importantPoints[mod(i - 2, importantPoints.length)];
@@ -526,7 +530,7 @@ export function translateCurve(curve: Curve, dx: number, dy: number, canvasPrope
 }
 
 
-export const sortByPointOrder = (pts: Point[], a: Point, b: Point) => pts.findIndex((v: Point) => _isEqual(a, v)) - pts.findIndex((v: Point) => _isEqual(b, v));
+export const sortByPointOrder = (pts: Point[], a: Point, b: Point) => pts.findIndex((v: Point) => pointsEqual(a, v)) - pts.findIndex((v: Point) => pointsEqual(b, v));
 
 export function rotateCurve(curve: Curve, angle: number, center: Point, canvasProperties: CanvasProperties) {
     const pts = curve.pts;
@@ -565,7 +569,7 @@ export function stretchTurningPoint(selectedCurve: Curve, movedPoint: Point, mou
     if (prevImportant && nextImportant) {
         const leftImportant = (prevImportant.x < nextImportant.x) ? prevImportant : nextImportant;
         const rightImportant = (prevImportant.x < nextImportant.x) ? nextImportant : prevImportant;
-        const isMaxima = selectedCurve.maxima.findIndex((maxima) => _isEqual(maxima, movedPoint)) !== -1;
+        const isMaxima = selectedCurve.maxima.findIndex((maxima) => pointsEqual(maxima, movedPoint)) !== -1;
         withinXBoundary = (rightImportant.x - mousePosition.x) > XBUFFER && (mousePosition.x - leftImportant.x) > XBUFFER;
         withinYBoundary = (isMaxima && ((rightImportant.y - mousePosition.y) > YBUFFER && (leftImportant.y - mousePosition.y) > YBUFFER)) || (!isMaxima && ((mousePosition.y - rightImportant.y) > YBUFFER && (mousePosition.y - leftImportant.y) > YBUFFER));
     } else {
@@ -601,7 +605,7 @@ export function stretchTurningPoint(selectedCurve: Curve, movedPoint: Point, mou
         const rotateList = (list: Point[], n: number) => list.slice(n).concat(list.slice(0, n));
 
         // rotate internal curve representation if closed -- see below
-        const originalPrevPrevImportantIndex = selectedCurve.pts.findIndex((v: Point) => _isEqual(v, prevPrevImportant));
+        const originalPrevPrevImportantIndex = selectedCurve.pts.findIndex((v: Point) => pointsEqual(v, prevPrevImportant));
         if (selectedCurve.isClosed && isDefined(originalPrevPrevImportantIndex)) {
             // rotate so pPI is the first point, then recalculate curve properties
             selectedCurve.pts = rotateList(selectedCurve.pts, originalPrevPrevImportantIndex);
@@ -618,10 +622,10 @@ export function stretchTurningPoint(selectedCurve: Curve, movedPoint: Point, mou
         // it is incremented at most once per iteration, determining which section of the curve we are in (leftStatic, leftStretched, rightStretched, rightStatic):
         const updateSectionState = (pt : Point) => {
             // note: this can't be simplified into an (a || b || ... ? currentSectionState+1 % 4) because two of the same point can appear twice in a row in closed loops.
-            if (_isEqual(pt, prevImportant)) currentSectionState = 1;
-            if (_isEqual(pt, currImportant)) currentSectionState = 2;
-            if (_isEqual(pt, nextImportant)) currentSectionState = 3;
-            if (_isEqual(pt, prevPrevImportant)) currentSectionState = 0;
+            if (pointsEqual(pt, prevImportant)) currentSectionState = 1;
+            if (pointsEqual(pt, currImportant)) currentSectionState = 2;
+            if (pointsEqual(pt, nextImportant)) currentSectionState = 3;
+            if (pointsEqual(pt, prevPrevImportant)) currentSectionState = 0;
         };
         // we *almost* always start in leftStatic.
         // if the line is not closed:

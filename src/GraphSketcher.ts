@@ -13,6 +13,24 @@ export class Point {
         this.x = x;
         this.y = y;
     }
+
+    public toArray = (): number[] => {
+        return [this.x, this.y];
+    };
+}
+
+export class ExternalCurve {
+    pts: number[][] = [];
+    minX: number = 0;
+    maxX: number = 0;
+    minY: number = 0;
+    maxY: number = 0;
+    interX: number[][] = [];
+    interY: number[][] = [];
+    maxima: number[][] = [];
+    minima: number[][] = [];
+    colorIdx: number = -1;
+    isClosed: boolean = false;
 }
 export class Curve {
     pts: Point[] = [];
@@ -55,6 +73,7 @@ enum Action {
 export enum LineType { BEZIER, LINEAR }
 
 export interface GraphSketcherState { canvasWidth: number; canvasHeight: number; curves?: Curve[] }
+export interface GraphSketcherExternalState { canvasWidth: number; canvasHeight: number; curves?: ExternalCurve[] }
 
 interface Checkpoint {
     curvesJSON?: string;
@@ -77,7 +96,7 @@ export class GraphSketcher {
     public static CURVE_LIMIT = 3;
     public static MERGE_STATIONARY_POINT_RADIUS = 5;
     public static CLIP_RADIUS = 15;
-    public static MOUSE_DETECT_RADIUS = 20;
+    public static MOUSE_DETECT_RADIUS = 10;
     public static IMPORTANT_POINT_DETECT_RADIUS = 30;
     public static REQUIRED_CURVE_ON_SCREEN_RATIO = 0.50; // 50% of a curves points must be on screen or it will be deleted
 
@@ -159,7 +178,59 @@ export class GraphSketcher {
         this.allowMultiValuedFunctions = options.allowMultiValuedFunctions ?? false;
         this._state = GraphUtils.decodeData({ curves: options.initialCurves ?? [], canvasWidth: width, canvasHeight: height }, this.canvasProperties);
         this._oldState = _cloneDeep(this._state);
+
+        addEventListener("resize", () => GraphSketcher.getCanvasPropertiesForResolution(window.innerHeight, window.innerWidth));
     }
+
+    private static toExternalCurve = (curve: Curve): ExternalCurve => {
+        const ec = new ExternalCurve();
+        ec.pts = curve.pts.map(p => p.toArray());
+        ec.interX = curve.interX.map(p => p.toArray());
+        ec.interY = curve.interY.map(p => p.toArray());
+        ec.maxima = curve.maxima.map(p => p.toArray());
+        ec.minima = curve.minima.map(p => p.toArray());
+        ec.minX = curve.minX;
+        ec.maxX = curve.maxX;
+        ec.minY = curve.minY;
+        ec.maxY = curve.maxY;
+        ec.colorIdx = curve.colorIdx;
+        ec.isClosed = curve.isClosed;
+        return ec;
+    };
+
+    private static toInternalCurve = (curve: ExternalCurve): Curve => {
+        const ic = new Curve();
+        ic.pts = curve.pts.map(p => new Point(p[0], p[1]));
+        ic.interX = curve.interX.map(p => new Point(p[0], p[1]));
+        ic.interY = curve.interY.map(p => new Point(p[0], p[1]));
+        ic.maxima = curve.maxima.map(p => new Point(p[0], p[1]));
+        ic.minima = curve.minima.map(p => new Point(p[0], p[1]));
+        ic.minX = curve.minX;
+        ic.maxX = curve.maxX;
+        ic.minY = curve.minY;
+        ic.maxY = curve.maxY;
+        ic.colorIdx = curve.colorIdx;
+        ic.isClosed = curve.isClosed;
+        return ic;
+    };
+
+    public static toExternalState = (state: GraphSketcherState): GraphSketcherExternalState => {
+        const externState: GraphSketcherExternalState = {canvasHeight: state.canvasHeight, canvasWidth: state.canvasWidth, curves: []};
+        state.curves?.forEach((c) => {
+            const s = this.toExternalCurve(c);
+            externState.curves?.push(s);
+        });
+        return externState;
+    };
+
+    public static toInternalState = (state: GraphSketcherExternalState): GraphSketcherState => {
+        const internalState: GraphSketcherState = {canvasHeight: state.canvasHeight, canvasWidth: state.canvasWidth, curves: []};
+        state.curves?.forEach((c) => {
+            const s = this.toInternalCurve(c);
+            internalState.curves?.push(s);
+        });
+        return internalState;
+    };
 
     // run in the beginning by p5 library
     private setup = () => {
@@ -350,6 +421,11 @@ export class GraphSketcher {
         return this.checkPointsRedo.length > 0;
     };
 
+    public setSlopVisible = (visible: boolean) => {
+        this.graphView.setSlopVisible(visible);
+        this.reDraw();
+    };
+
     // Check if movement to new position is over an actionable object, so can render appropriately
     private mouseMoved = (e: MouseEvent) => {
         if (this.previewMode) return;
@@ -379,14 +455,6 @@ export class GraphSketcher {
                 //this.reDraw();  // FIXME why was this here in the first place
             }
         }
-
-        const makeDiamond = (x: number, y: number, w: number) => {
-            this.p.push();
-            this.p.translate(x, y);
-            this.p.rotate(this.p.QUARTER_PI);
-            this.p.square(0, 0, w);
-            this.p.pop();
-        };
 
         // stretch box
         if (isDefined(this.clickedCurveIdx) && isDefined(this._state.curves)) {
@@ -429,13 +497,13 @@ export class GraphSketcher {
             } else if (detect(c.minX - 16, c.minY - 16) || detect(c.maxX + 16, c.minY - 16) || detect(c.minX - 16, c.maxY + 16) || detect(c.maxX + 16, c.maxY + 16)) {
                 this.p.cursor(this.p.MOVE);
                 if (detect(c.minX - 16, c.minY - 16)) {
-                    makeDiamond(c.minX - 16, c.minY - 16, 4);
+                    this.graphView.makeDiamond(c.minX - 16, c.minY - 16, 4);
                 } else if (detect(c.maxX + 16, c.minY - 16)) {
-                    makeDiamond(c.maxX + 16, c.minY - 16, 4);
+                    this.graphView.makeDiamond(c.maxX + 16, c.minY - 16, 4);
                 } else if (detect(c.minX - 16, c.maxY + 16)) {
-                    makeDiamond(c.minX - 16, c.maxY + 16, 4);
+                    this.graphView.makeDiamond(c.minX - 16, c.maxY + 16, 4);
                 } else {
-                    makeDiamond(c.maxX + 16, c.maxY + 16, 4);
+                    this.graphView.makeDiamond(c.maxX + 16, c.maxY + 16, 4);
                 }
             } else if (mousePosition.x >= c.minX && mousePosition.x <= c.maxX && mousePosition.y >= c.minY && mousePosition.y <= c.maxY) {
                 this.graphView.drawStretchBox(this.clickedCurveIdx, this._state.curves);

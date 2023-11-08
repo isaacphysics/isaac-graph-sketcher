@@ -2,6 +2,14 @@ import p5 from 'p5';
 import * as graphUtils from './GraphUtils';
 import {CanvasProperties, Curve, Dimension, Point} from './GraphSketcher';
 
+enum KNOT_STYLE {
+    AXIS_INTERCEPT,
+    MAXIMA,
+    MINIMA,
+    END_POINT,
+    INTERSECTION
+}
+
 // self explanatory drawing methods
 export default class GraphView {
 
@@ -9,6 +17,10 @@ export default class GraphView {
 
     private canvasProperties: CanvasProperties;
     private backgroundGraphic: p5.Graphics;
+
+    private AXIS_SLOP: number;
+    private ORIGIN_SLOP: number;
+    private slopVisible = false;
 
     private DOT_LINE_COLOR = [123];
     private DEFAULT_KNOT_COLOR = [77,77,77];
@@ -24,6 +36,11 @@ export default class GraphView {
     constructor(p: p5, canvasProperties: CanvasProperties) {
         this.p = p;
         this.PADDING = 0.025 * canvasProperties.axisLengthPx;
+
+        // these values should be synced with those in IsaacGraphSketcherSettings.java in the API
+        this.AXIS_SLOP = 0.005 * canvasProperties.axisLengthPx;
+        this.ORIGIN_SLOP = 0.01 * canvasProperties.axisLengthPx;
+
         this.canvasProperties = canvasProperties;
         this.backgroundGraphic = this.p.createGraphics(canvasProperties.widthPx, canvasProperties.heightPx);
         this.refreshBackground();
@@ -54,21 +71,21 @@ export default class GraphView {
 
         if (drawKnots) {   
             // draw x intercepts, y intercepts, turning points, and end points
-            this.drawKnots(curve.interX);
-            this.drawKnots(curve.interY);
-            this.drawKnots(curve.maxima);
-            this.drawKnots(curve.minima);
-            if (!curve.isClosed) this.drawKnots(graphUtils.findEndPts(curve.pts));
+            this.drawKnots(curve.interX, undefined, KNOT_STYLE.AXIS_INTERCEPT);
+            this.drawKnots(curve.interY, undefined, KNOT_STYLE.AXIS_INTERCEPT);
+            this.drawKnots(curve.maxima, undefined, KNOT_STYLE.MAXIMA);
+            this.drawKnots(curve.minima, undefined, KNOT_STYLE.MINIMA);
+            if (!curve.isClosed) this.drawKnots(graphUtils.findEndPts(curve.pts), undefined, KNOT_STYLE.END_POINT);
         }
     }
 
-    drawKnots(knots: Point[], color?: number[]) {
+    drawKnots(knots: Point[], color?: number[], style?: KNOT_STYLE) {
         for (let i = 0; i < knots.length; i++) {
-            this.drawKnot(knots[i], color);
+            this.drawKnot(knots[i], color, style);
         }
     }
 
-    drawKnot(knot: Point, color?: number[]) {
+    drawKnot(knot: Point, color?: number[], style?: KNOT_STYLE) {
         // Don't draw knots that are outside the plot area
         if (knot.x < this.canvasProperties.plotStartPx.x || knot.x > this.canvasProperties.plotEndPx.x ||
             knot.y < this.canvasProperties.plotStartPx.y || knot.y > this.canvasProperties.plotEndPx.y
@@ -79,11 +96,31 @@ export default class GraphView {
             color = this.DEFAULT_KNOT_COLOR;
         }
         this.p.push();
-        this.p.noFill();
         this.p.stroke(color);
         this.p.strokeWeight(1.5);
-        this.p.line(knot.x - 3, knot.y - 3, knot.x + 3, knot.y + 3);
-        this.p.line(knot.x + 3, knot.y - 3, knot.x - 3, knot.y + 3);
+        switch (style) {
+            case KNOT_STYLE.INTERSECTION: {
+                this.p.circle(knot.x, knot.y, 4);
+                break;
+            }
+            case KNOT_STYLE.END_POINT: {
+                this.p.square(knot.x - 2, knot.y - 2, 4);
+                break;
+            }
+            case KNOT_STYLE.MAXIMA: {
+                this.p.triangle(knot.x - 3, knot.y + 3, knot.x + 3, knot.y + 3, knot.x, knot.y - 3);
+                break;
+            }
+            case KNOT_STYLE.MINIMA: {
+                this.p.triangle(knot.x - 3, knot.y - 3, knot.x + 3, knot.y - 3, knot.x, knot.y + 3);
+                break;
+            }
+            default: {
+                this.p.line(knot.x - 3, knot.y - 3, knot.x + 3, knot.y + 3);
+                this.p.line(knot.x + 3, knot.y - 3, knot.x - 3, knot.y + 3);
+                break;
+            }
+        }
         this.p.pop();
     }
 
@@ -163,7 +200,7 @@ export default class GraphView {
 
     makeDiamond(x: number, y: number, w: number) {
         this.p.push();
-        this.p.translate(x, y);
+        this.p.translate(x, y - w/Math.SQRT2);
         this.p.rotate(this.p.QUARTER_PI);
         this.p.square(0, 0, w);
         this.p.pop();
@@ -312,6 +349,24 @@ export default class GraphView {
         this.drawLabel();
     }
 
+    public setSlopVisible = (visible: boolean) => {
+        this.slopVisible = visible;
+    };
+
+    drawSlop(canvasProperties: CanvasProperties) {
+        const width = canvasProperties.plotEndPx.x - canvasProperties.plotStartPx.x;
+        const height = canvasProperties.plotEndPx.y - canvasProperties.plotStartPx.y;
+        this.p.push();
+        this.p.noStroke();
+        this.p.fill(183, 204, 229, 128);
+        this.p.rect(canvasProperties.plotStartPx.x, canvasProperties.centerPx.y - this.AXIS_SLOP, width, 2 * this.AXIS_SLOP);
+        this.p.fill(183, 211, 170, 128);
+        this.p.rect(canvasProperties.centerPx.x - this.AXIS_SLOP, canvasProperties.plotStartPx.y, 2 * this.AXIS_SLOP, height);
+        this.p.fill(229, 190, 183, 192);
+        this.makeDiamond(canvasProperties.centerPx.x, canvasProperties.centerPx.y, this.ORIGIN_SLOP * Math.sqrt(2));
+        this.p.pop();
+    }
+
     drawBoundaries(canvasProperties: CanvasProperties) {
         this.p.push();
         this.p.noStroke();
@@ -341,6 +396,9 @@ export default class GraphView {
             this.refreshBackground();
         }
         this.p.image(this.backgroundGraphic, 0, 0);
+        if (this.slopVisible) {
+            this.drawSlop(canvasProperties);
+        }
     }
 
     drawCorner(stretchMode: string, c: Curve) {
