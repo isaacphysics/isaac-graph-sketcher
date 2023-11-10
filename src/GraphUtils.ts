@@ -12,6 +12,7 @@ export function isDefined<T>(stuff: T): stuff is NonNullable<T> {
 }
 
 const SAMPLE_INTERVAL = 10;
+const EXTREMA_DETECTION_HEIGHT = 5;
 const numOfPts = 200;
 
 // methods used in manipulating the graphs
@@ -416,6 +417,9 @@ export function findTurnPts(pts: Point[], mode: string, isClosed: boolean = fals
         if (pts[i].y < pts[mod(i-1, pts.length)].y) {
             while (pts[i].y == pts[mod(i+1, pts.length)].y) {
                 i += 1;
+                if (i == pts.length - 1) {
+                    return false;
+                }
             }
             return pts[i].y < pts[mod(i+1, pts.length)].y;
         }
@@ -426,16 +430,31 @@ export function findTurnPts(pts: Point[], mode: string, isClosed: boolean = fals
         if (pts[i].y > pts[mod(i-1, pts.length)].y) {
             while (pts[i].y == pts[mod(i+1, pts.length)].y) {
                 i += 1;
+                if (i == pts.length - 1) {
+                    return false;
+                }
             }
             return pts[i].y > pts[mod(i+1, pts.length)].y;
         }
         return false;
     };
 
+    // does any point within 5 points of i have a y value greater than (maxima) / less than (minima) (remember y is inverted) EXTREMA_DETECTION_HEIGHT units further than pts[i].y?
+    const isNotable = (i: number, style: TurningPointStyle) => {
+        for (let j = isClosed ? 0 : Math.min(0, i - 5); j < (isClosed ? pts.length : Math.max(pts.length, i + 5)); j++) {
+            if (style === TurningPointStyle.MAXIMA && pts[mod(j, pts.length)].y > pts[i].y + EXTREMA_DETECTION_HEIGHT) {
+                return true;
+            } else if (style === TurningPointStyle.MINIMA && pts[mod(j, pts.length)].y < pts[i].y - EXTREMA_DETECTION_HEIGHT) {
+                return true;
+            }
+        }
+        return false;
+    };
+
     for (let i = CUTOFF; i < pts.length-1-CUTOFF; i++) {
-        if (isMaxima(i)) {
+        if (isMaxima(i) && isNotable(i, TurningPointStyle.MAXIMA)) {
             stationaryPts.push({point: new Point(pts[i].x, pts[i].y), style: TurningPointStyle.MAXIMA} as TurningPoint);
-        } else if (isMinima(i)) {
+        } else if (isMinima(i) && isNotable(i, TurningPointStyle.MINIMA)) {
             stationaryPts.push({point: new Point(pts[i].x, pts[i].y), style: TurningPointStyle.MINIMA} as TurningPoint);
         }
     }
