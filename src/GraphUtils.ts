@@ -165,7 +165,9 @@ export function recalculateCurveProperties(curve: Curve, canvasProperties: Canva
     curve.minima = findTurnPts(curve.pts, 'minima');}
 
 export function linearLineStyle(pts: Point[]) {
-    pts.sort(function(a, b){return a.x - b.x;});
+    // while we _could_ just use the first and last points, the curve click detection works by the mouse being near a point in the curve,
+    // so we do need a lot of points to be able to click anywhere on the curve and it still select it.
+    pts.sort(sortByPointOrder.bind(undefined, pts));
     const increment = 1/numOfPts;
     const linearPoints = [];
     const x_diff = pts[1].x-pts[0].x;
