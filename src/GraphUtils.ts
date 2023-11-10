@@ -330,14 +330,18 @@ export function findInterceptX(canvasProperties: CanvasProperties, pts: Point[])
 
     const intercepts = [];
 
-    if (pts[0].y == canvasProperties.centerPx.y) intercepts.push(pts[0]);
-    for (let i = 1; i < pts.length; i++) {
-        if (pts[i].y == canvasProperties.centerPx.y) {
-            intercepts.push(new Point(pts[i].x, pts[i].y));
+    for (let i = 0; i < pts.length-1; i++) {
+        if (pts[i].y === canvasProperties.centerPx.y) {
+            const start = i;
+            for (; i < pts.length && pts[i].y === canvasProperties.centerPx.y; i++);
+            // show the intercept at the midpoint of the flat section, but only if there exist at least two other points not on the flat section
+            if (start > 0 && i < pts.length - 1) {
+                intercepts.push(new Point(pts[Math.round((start + i) / 2)].x, pts[Math.round((start + i) / 2)].y));
+            }
             continue;
         }
 
-        if ((pts[i-1].y - canvasProperties.centerPx.y) * (pts[i].y - canvasProperties.centerPx.y) < 0 && (pts[i-1].y - pts[i].y < Math.abs(200))) {
+        if (i > 0 && (pts[i-1].y - canvasProperties.centerPx.y) * (pts[i].y - canvasProperties.centerPx.y) < 0 && (pts[i-1].y - pts[i].y < Math.abs(200))) {
             const dx = pts[i].x - pts[i-1].x;
             const dy = pts[i].y - pts[i-1].y;
             const grad = dy/dx;
@@ -356,8 +360,13 @@ export function findInterceptY(canvasProperties: CanvasProperties, pts: Point[])
 
     if (pts[0].x == canvasProperties.centerPx.x) intercepts.push(pts[0]);
     for (let i = 1; i < pts.length; i++) {
-        if (pts[i].x == canvasProperties.centerPx.x) {
-            intercepts.push(new Point(pts[i].x, pts[i].y));
+        if (pts[i].x === canvasProperties.centerPx.x) {
+            const start = i;
+            for (; i < pts.length && pts[i].x === canvasProperties.centerPx.x; i++);
+            // show the intercept at the midpoint of the flat section, but only if there exist at least two other points not on the flat section
+            if (start > 0 && i < pts.length - 1) {
+                intercepts.push(new Point(pts[Math.round((start + i) / 2)].x, pts[Math.round((start + i) / 2)].y));
+            }
             continue;
         }
 
@@ -461,69 +470,24 @@ export function findImportantPoints(curve: Curve) {
 
 // given a curve, translate the curve
 export function translateCurve(curve: Curve, dx: number, dy: number, canvasProperties: CanvasProperties) {
-    const pts = curve.pts;
-
     curve.minX += dx;
     curve.maxX += dx;
     curve.minY += dy;
     curve.maxY += dy;
 
-    for (let i = 0; i < pts.length; i++) {
-        pts[i].x += dx;
-        pts[i].y += dy;
+    function translatePts(pts: Point[]) {
+        pts.forEach((pt) => {
+            pt.x += dx;
+            pt.y += dy;
+        });
     }
+    
+    translatePts(curve.pts);
+    translatePts(curve.maxima);
+    translatePts(curve.minima);
 
-    function moveTurnPts(knots: Point[]) {
-        for (let i = 0; i < knots.length; i++) {
-            const knot = knots[i];
-
-            knot.x += dx;
-            knot.y += dy;
-        }
-    }
-
-    const maxima = curve.maxima;
-    moveTurnPts(maxima);
-
-    const minima = curve.minima;
-    moveTurnPts(minima);
-
-
-    const moveInter = function(inter: Point[], newInter: Point[]) {
-        for (let i = 0; i < inter.length; i++) {
-            // if (inter[i].symbol != undefined) {
-            //     let symbol = inter[i].symbol;
-
-            //     let found = false,
-            //         min = 50,
-            //         knot;
-            //     for (let j = 0; j < newInter.length; j++) {
-            //         if (getDist(inter[i], newInter[j]) < min) {
-            //             min = getDist(inter[i], newInter[j]);
-            //             knot = newInter[j];
-            //             found = true;
-            //         }
-            //     }
-
-            //     if (found) {
-            //         symbol.x = knot.x;
-            //         symbol.y = knot.y;
-            //         knot.symbol = symbol;
-            //     } 
-            // }
-        }
-        return newInter;
-    };
-
-    const interX = curve.interX,
-        newInterX = findInterceptX(canvasProperties, pts);
-    curve.interX = moveInter(interX, newInterX);
-
-    const interY = curve.interY,
-        newInterY = findInterceptY(canvasProperties, pts);
-    curve.interY = moveInter(interY, newInterY);
-
-    return;
+    curve.interX = findInterceptX(canvasProperties, curve.pts);
+    curve.interY = findInterceptY(canvasProperties, curve.pts);
 }
 
 
@@ -679,12 +643,13 @@ export function stretchTurningPoint(importantPoints: Point[], e: MouseEvent | To
 
 export function stretchCurve(c: Curve, orx: number, ory: number, nrx: number, nry: number, baseX: number, baseY: number) {
 
-    function stretch(pt: Point) {
+    const stretch = (pt: Point) => {
         const nx = (pt.x - baseX) / orx;
         const ny = (pt.y - baseY) / ory;
         pt.x = nx * nrx + baseX;
         pt.y = ny * nry + baseY;
-    }
+    };
+    
     // stretch each point
     c.pts.forEach(stretch);
 }
