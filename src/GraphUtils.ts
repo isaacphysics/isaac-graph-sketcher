@@ -1,4 +1,4 @@
-import {CanvasProperties, Curve, Dimension, GraphSketcher, GraphSketcherState, Point} from "./GraphSketcher";
+import {CanvasProperties, Curve, Dimension, GraphSketcher, GraphSketcherState, LineType, Point} from "./GraphSketcher";
 
 export function pointsEqual(p?: Point, q?: Point) {
     if (!isDefined(p) || !isDefined(q)) return false;
@@ -565,6 +565,16 @@ export function stretchTurningPoint(selectedCurve: Curve, movedPoint: Point, mou
     
     let importantPoints = findImportantPoints(selectedCurve);
     
+    if (selectedCurve.lineType === LineType.LINEAR) {
+        const currImportant = movedPoint;
+        const otherImportant = importantPoints.find((v) => !pointsEqual(v, currImportant));
+        if (isDefined(otherImportant)) {
+            stretchLinearCurve(selectedCurve, currImportant, mousePosition);
+            recalculateCurveProperties(selectedCurve, canvasProperties);
+        }
+        return selectedCurve;
+    }
+    
     const nearbyImportants = calculateNearbyImportantPoints(selectedCurve, importantPoints, movedPoint);
     const prevPrevImportant = nearbyImportants.prevPrevImportant;
     let prevImportant = nearbyImportants.prevImportant;
@@ -726,6 +736,19 @@ export function stretchCurve(c: Curve, orx: number, ory: number, nrx: number, nr
     
     // stretch each point
     c.pts.forEach(stretch);
+}
+
+export function stretchLinearCurve(c: Curve, current: Point, target: Point) {
+    const other = c.pts.find((v) => !pointsEqual(v, current));
+    if (!isDefined(other)) return;
+
+    const xDist = (target.x - other.x) / c.pts.length;
+    const yDist = (target.y - other.y) / c.pts.length;
+    
+    c.pts.forEach((pt, i) => {
+        pt.x = other.x + (i * xDist);
+        pt.y = other.y + (i * yDist);
+    });
 }
 
 function _clone<T>(obj: T) {

@@ -42,6 +42,7 @@ export class Curve {
     interY: Point[] = [];
     maxima: Point[] = [];
     minima: Point[] = [];
+    lineType?: LineType;
     colorIdx: number = -1;
     isClosed: boolean = false;
 }
@@ -910,6 +911,7 @@ export class GraphSketcher {
 
                 curve.pts = pts;
                 curve.colorIdx = this.drawnColorIdx;
+                curve.lineType = this.selectedLineType;
                 GraphUtils.recalculateCurveProperties(curve, this.canvasProperties);
                 this._state.curves.push(curve);
                 this.reDraw();
