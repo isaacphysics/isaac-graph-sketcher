@@ -644,10 +644,14 @@ export function stretchTurningPoint(importantPoints: Point[], e: MouseEvent | To
 export function stretchCurve(c: Curve, orx: number, ory: number, nrx: number, nry: number, baseX: number, baseY: number) {
 
     const stretch = (pt: Point) => {
-        const nx = (pt.x - baseX) / orx;
-        const ny = (pt.y - baseY) / ory;
-        pt.x = nx * nrx + baseX;
-        pt.y = ny * nry + baseY;
+        if (Math.abs(orx) >= 1e-3) {
+            const nx = (pt.x - baseX) / orx;
+            pt.x = nx * nrx + baseX;
+        }
+        if (Math.abs(ory) >= 1e-3) {
+            const ny = (pt.y - baseY) / ory;
+            pt.y = ny * nry + baseY;
+        }
     };
     
     // stretch each point
