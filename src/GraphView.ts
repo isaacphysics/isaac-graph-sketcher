@@ -10,6 +10,30 @@ enum KNOT_STYLE {
     INTERSECTION
 }
 
+export enum AxisStretchPosition {
+    MIN,
+    MIDDLE,
+    MAX
+}
+export class StretchMode {
+    public static TOP = new StretchMode(AxisStretchPosition.MIDDLE, AxisStretchPosition.MAX);
+    public static BOTTOM = new StretchMode(AxisStretchPosition.MIDDLE, AxisStretchPosition.MIN);
+    public static LEFT = new StretchMode(AxisStretchPosition.MIN, AxisStretchPosition.MIDDLE);
+    public static RIGHT = new StretchMode(AxisStretchPosition.MAX, AxisStretchPosition.MIDDLE);
+    public static TOPLEFT = new StretchMode(AxisStretchPosition.MIN, AxisStretchPosition.MAX);
+    public static TOPRIGHT = new StretchMode(AxisStretchPosition.MAX, AxisStretchPosition.MAX);
+    public static BOTTOMLEFT = new StretchMode(AxisStretchPosition.MIN, AxisStretchPosition.MIN);
+    public static BOTTOMRIGHT = new StretchMode(AxisStretchPosition.MAX, AxisStretchPosition.MIN);
+
+    public x: AxisStretchPosition;
+    public y: AxisStretchPosition;
+
+    private constructor(x: AxisStretchPosition, y: AxisStretchPosition) {
+        this.x = x;
+        this.y = y;
+    }
+}
+
 // self explanatory drawing methods
 export default class GraphView {
 
@@ -62,9 +86,7 @@ export default class GraphView {
         // want to connect closest points x,y wise, not just x wise
         const pts = curve.pts;
         for (let i = 1; i < pts.length; i++) {
-            if (pts[i].x - pts[i-1].x < 100 && pts[i].y - pts[i-1].y < 100) {// 100 chosen as close enough to reliably be the same curve
-                this.p.line(pts[i-1].x, pts[i-1].y, pts[i].x, pts[i].y);
-            }
+            this.p.line(pts[i-1].x, pts[i-1].y, pts[i].x, pts[i].y);
         }
 
         this.p.pop();
@@ -401,39 +423,39 @@ export default class GraphView {
         }
     }
 
-    drawCorner(stretchMode: string, c: Curve) {
+    drawCorner(stretchMode: StretchMode, c: Curve) {
         this.p.push();
         this.p.fill(this.KNOT_DETECT_COLOR);
         switch (stretchMode) {
-            case "bottomLeft": {
+            case StretchMode.BOTTOMLEFT: {
                 this.p.rect(c.minX - 4, c.minY - 4, 8, 8);
                 break;
             }
-            case "bottomRight": {
+            case StretchMode.BOTTOMRIGHT: {
                 this.p.rect(c.maxX - 4, c.minY - 4, 8, 8);
                 break;
             }
-            case "topRight": {
+            case StretchMode.TOPRIGHT: {
                 this.p.rect(c.maxX - 4, c.maxY - 4, 8, 8);
                 break;
             }
-            case "topLeft": {
+            case StretchMode.TOPLEFT: {
                 this.p.rect(c.minX - 4, c.maxY - 4, 8, 8);
                 break;
             }
-            case "bottomMiddle": {
+            case StretchMode.BOTTOM: {
                 this.p.triangle((c.minX + c.maxX)/2 - 5, c.minY - 2, (c.minX + c.maxX)/2 + 5, c.minY - 2, (c.minX + c.maxX)/2, c.minY - 7);
                 break;
             }
-            case "topMiddle": {
+            case StretchMode.TOP: {
                 this.p.triangle((c.minX + c.maxX)/2 - 5, c.maxY + 2, (c.minX + c.maxX)/2 + 5, c.maxY + 2, (c.minX + c.maxX)/2, c.maxY + 7);
                 break;
             }
-            case "leftMiddle": {
+            case StretchMode.LEFT: {
                 this.p.triangle(c.minX - 2, (c.minY + c.maxY) / 2 - 5, c.minX - 2, (c.minY + c.maxY) / 2 + 5, c.minX - 7, (c.minY + c.maxY) / 2);
                 break;
             }
-            case "rightMiddle": {
+            case StretchMode.RIGHT: {
                 this.p.triangle(c.maxX + 2, (c.minY + c.maxY) / 2 - 5, c.maxX + 2, (c.minY + c.maxY) / 2 + 5, c.maxX + 7, (c.minY + c.maxY) / 2);
                 break;
             }

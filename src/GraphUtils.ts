@@ -166,7 +166,9 @@ export function recalculateCurveProperties(curve: Curve, canvasProperties: Canva
 }
 
 export function linearLineStyle(pts: Point[]) {
-    pts.sort(function(a, b){return a.x - b.x;});
+    // while we _could_ just use the first and last points, the curve click detection works by the mouse being near a point in the curve,
+    // so we do need a lot of points to be able to click anywhere on the curve and it still select it.
+    pts.sort(sortByPointOrder.bind(undefined, pts));
     const increment = 1/numOfPts;
     const linearPoints = [];
     const x_diff = pts[1].x-pts[0].x;
@@ -331,14 +333,18 @@ export function findInterceptX(canvasProperties: CanvasProperties, pts: Point[])
 
     const intercepts = [];
 
-    if (pts[0].y == canvasProperties.centerPx.y) intercepts.push(pts[0]);
-    for (let i = 1; i < pts.length; i++) {
-        if (pts[i].y == canvasProperties.centerPx.y) {
-            intercepts.push(new Point(pts[i].x, pts[i].y));
+    for (let i = 0; i < pts.length-1; i++) {
+        if (pts[i].y === canvasProperties.centerPx.y) {
+            const start = i;
+            for (; i < pts.length && pts[i].y === canvasProperties.centerPx.y; i++);
+            // show the intercept at the midpoint of the flat section, but only if there exist at least two other points not on the flat section
+            if (start > 0 && i < pts.length - 1) {
+                intercepts.push(new Point(pts[Math.round((start + i) / 2)].x, pts[Math.round((start + i) / 2)].y));
+            }
             continue;
         }
 
-        if ((pts[i-1].y - canvasProperties.centerPx.y) * (pts[i].y - canvasProperties.centerPx.y) < 0 && (pts[i-1].y - pts[i].y < Math.abs(200))) {
+        if (i > 0 && (pts[i-1].y - canvasProperties.centerPx.y) * (pts[i].y - canvasProperties.centerPx.y) < 0 && (pts[i-1].y - pts[i].y < Math.abs(200))) {
             const dx = pts[i].x - pts[i-1].x;
             const dy = pts[i].y - pts[i-1].y;
             const grad = dy/dx;
@@ -357,8 +363,13 @@ export function findInterceptY(canvasProperties: CanvasProperties, pts: Point[])
 
     if (pts[0].x == canvasProperties.centerPx.x) intercepts.push(pts[0]);
     for (let i = 1; i < pts.length; i++) {
-        if (pts[i].x == canvasProperties.centerPx.x) {
-            intercepts.push(new Point(pts[i].x, pts[i].y));
+        if (pts[i].x === canvasProperties.centerPx.x) {
+            const start = i;
+            for (; i < pts.length && pts[i].x === canvasProperties.centerPx.x; i++);
+            // show the intercept at the midpoint of the flat section, but only if there exist at least two other points not on the flat section
+            if (start > 0 && i < pts.length - 1) {
+                intercepts.push(new Point(pts[Math.round((start + i) / 2)].x, pts[Math.round((start + i) / 2)].y));
+            }
             continue;
         }
 
@@ -702,12 +713,17 @@ export function stretchTurningPoint(selectedCurve: Curve, movedPoint: Point, mou
 
 export function stretchCurve(c: Curve, orx: number, ory: number, nrx: number, nry: number, baseX: number, baseY: number) {
 
-    function stretch(pt: Point) {
-        const nx = (pt.x - baseX) / orx;
-        const ny = (pt.y - baseY) / ory;
-        pt.x = nx * nrx + baseX;
-        pt.y = ny * nry + baseY;
-    }
+    const stretch = (pt: Point) => {
+        if (Math.abs(orx) >= 1e-3) {
+            const nx = (pt.x - baseX) / orx;
+            pt.x = nx * nrx + baseX;
+        }
+        if (Math.abs(ory) >= 1e-3) {
+            const ny = (pt.y - baseY) / ory;
+            pt.y = ny * nry + baseY;
+        }
+    };
+    
     // stretch each point
     c.pts.forEach(stretch);
 }
