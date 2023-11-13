@@ -336,7 +336,9 @@ export function findInterceptX(canvasProperties: CanvasProperties, pts: Point[])
     for (let i = 0; i < pts.length-1; i++) {
         if (pts[i].y === canvasProperties.centerPx.y) {
             const start = i;
-            for (; i < pts.length && pts[i].y === canvasProperties.centerPx.y; i++);
+            while (i < pts.length && pts[i].y === canvasProperties.centerPx.y) {
+                i++;
+            }
             // show the intercept at the midpoint of the flat section, but only if there exist at least two other points not on the flat section
             if (start > 0 && i < pts.length - 1) {
                 intercepts.push(new Point(pts[Math.round((start + i) / 2)].x, pts[Math.round((start + i) / 2)].y));
@@ -365,7 +367,9 @@ export function findInterceptY(canvasProperties: CanvasProperties, pts: Point[])
     for (let i = 1; i < pts.length; i++) {
         if (pts[i].x === canvasProperties.centerPx.x) {
             const start = i;
-            for (; i < pts.length && pts[i].x === canvasProperties.centerPx.x; i++);
+            while (i < pts.length && pts[i].y === canvasProperties.centerPx.y) {
+                i++;
+            }
             // show the intercept at the midpoint of the flat section, but only if there exist at least two other points not on the flat section
             if (start > 0 && i < pts.length - 1) {
                 intercepts.push(new Point(pts[Math.round((start + i) / 2)].x, pts[Math.round((start + i) / 2)].y));
