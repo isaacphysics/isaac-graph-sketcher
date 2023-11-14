@@ -141,7 +141,7 @@ export function decodeData(data: GraphSketcherState, canvasProperties: CanvasPro
 }
 
 // TODO 'e' is probably a mouse event of some sort
-export function detect(e: MouseEvent, x: number, y: number) {
+export function detect(e: MouseEvent | Touch, x: number, y: number) {
     const mousePosition = getMousePt(e);
     return (getDist(mousePosition, new Point(x, y)) < 5);
 }
@@ -161,11 +161,14 @@ export function recalculateCurveProperties(curve: Curve, canvasProperties: Canva
 
     curve.interX = findInterceptX(canvasProperties, curve.pts);
     curve.interY = findInterceptY(canvasProperties, curve.pts);
-    curve.maxima = findTurnPts(curve.pts, 'maxima');
-    curve.minima = findTurnPts(curve.pts, 'minima');}
+    curve.maxima = findTurnPts(curve.pts, 'maxima', curve.isClosed);
+    curve.minima = findTurnPts(curve.pts, 'minima', curve.isClosed);
+}
 
 export function linearLineStyle(pts: Point[]) {
-    pts.sort(function(a, b){return a.x - b.x;});
+    // while we _could_ just use the first and last points, the curve click detection works by the mouse being near a point in the curve,
+    // so we do need a lot of points to be able to click anywhere on the curve and it still select it.
+    pts.sort(sortByPointOrder.bind(undefined, pts));
     const increment = 1/numOfPts;
     const linearPoints = [];
     const x_diff = pts[1].x-pts[0].x;
@@ -330,14 +333,20 @@ export function findInterceptX(canvasProperties: CanvasProperties, pts: Point[])
 
     const intercepts = [];
 
-    if (pts[0].y == canvasProperties.centerPx.y) intercepts.push(pts[0]);
-    for (let i = 1; i < pts.length; i++) {
-        if (pts[i].y == canvasProperties.centerPx.y) {
-            intercepts.push(new Point(pts[i].x, pts[i].y));
+    for (let i = 0; i < pts.length-1; i++) {
+        if (pts[i].y === canvasProperties.centerPx.y) {
+            const start = i;
+            while (i < pts.length && pts[i].y === canvasProperties.centerPx.y) {
+                i++;
+            }
+            // show the intercept at the midpoint of the flat section, but only if there exist at least two other points not on the flat section
+            if (start > 0 && i < pts.length - 1) {
+                intercepts.push(new Point(pts[Math.round((start + i) / 2)].x, pts[Math.round((start + i) / 2)].y));
+            }
             continue;
         }
 
-        if ((pts[i-1].y - canvasProperties.centerPx.y) * (pts[i].y - canvasProperties.centerPx.y) < 0 && (pts[i-1].y - pts[i].y < Math.abs(200))) {
+        if (i > 0 && (pts[i-1].y - canvasProperties.centerPx.y) * (pts[i].y - canvasProperties.centerPx.y) < 0 && (pts[i-1].y - pts[i].y < Math.abs(200))) {
             const dx = pts[i].x - pts[i-1].x;
             const dy = pts[i].y - pts[i-1].y;
             const grad = dy/dx;
@@ -356,8 +365,15 @@ export function findInterceptY(canvasProperties: CanvasProperties, pts: Point[])
 
     if (pts[0].x == canvasProperties.centerPx.x) intercepts.push(pts[0]);
     for (let i = 1; i < pts.length; i++) {
-        if (pts[i].x == canvasProperties.centerPx.x) {
-            intercepts.push(new Point(pts[i].x, pts[i].y));
+        if (pts[i].x === canvasProperties.centerPx.x) {
+            const start = i;
+            while (i < pts.length && pts[i].y === canvasProperties.centerPx.y) {
+                i++;
+            }
+            // show the intercept at the midpoint of the flat section, but only if there exist at least two other points not on the flat section
+            if (start > 0 && i < pts.length - 1) {
+                intercepts.push(new Point(pts[Math.round((start + i) / 2)].x, pts[Math.round((start + i) / 2)].y));
+            }
             continue;
         }
 
@@ -374,69 +390,104 @@ export function findInterceptY(canvasProperties: CanvasProperties, pts: Point[])
 }
 
 export function findTurnPts(pts: Point[], mode: string, isClosed: boolean = false) {
+
+    enum TurningPointStyle {
+        MAXIMA,
+        MINIMA,
+        STATIONARY
+    }
+
+    interface TurningPoint {
+        point: Point;
+        style: TurningPointStyle;
+    }
+
     if (pts.length == 0) {
         return [];
     }
+    
+    // if the curve is closed (internally), there's a duplicate point at the start and end to visually "close" the curve (even if the user's drawing did not close).
+    // this causes problems with the min/max detection, so remove it here.
+    if (isClosed) {
+        pts = pts.slice(0, -1);
+    }
+
+    const stationaryPts: TurningPoint[] = [];
+    const CUTOFF = isClosed ? 0 : 10;
+
+    // since the y-axis is inverted, "minima" in the code are visual maxima. i love the graph sketcher
+    const isMaxima = (i: number) => {
+        if (pts[i].y < pts[mod(i-1, pts.length)].y) {
+            while (pts[i].y == pts[mod(i+1, pts.length)].y) {
+                i += 1;
+            }
+            return pts[i].y < pts[mod(i+1, pts.length)].y;
+        }
+        return false;
+    };
+
+    const isMinima = (i: number) => {
+        if (pts[i].y > pts[mod(i-1, pts.length)].y) {
+            while (pts[i].y == pts[mod(i+1, pts.length)].y) {
+                i += 1;
+            }
+            return pts[i].y > pts[mod(i+1, pts.length)].y;
+        }
+        return false;
+    };
+
+    for (let i = CUTOFF; i < pts.length-1-CUTOFF; i++) {
+        if (isMaxima(i)) {
+            stationaryPts.push({point: new Point(pts[i].x, pts[i].y), style: TurningPointStyle.MAXIMA} as TurningPoint);
+        } else if (isMinima(i)) {
+            stationaryPts.push({point: new Point(pts[i].x, pts[i].y), style: TurningPointStyle.MINIMA} as TurningPoint);
+        }
+    }
+
+    const distantStationaryPts: TurningPoint[] = [];
+    for (let i = 0; i < stationaryPts.length; i++) {
+        if (distantStationaryPts.every((v: TurningPoint) => getDist(v.point, stationaryPts[i].point) > GraphSketcher.MERGE_STATIONARY_POINT_RADIUS)) {
+            distantStationaryPts.push(stationaryPts[i]);
+        }
+    }
 
     let turnPts = [];
-    const potentialPts = [];
-    let statPts: Point[] = [];
-    const pot_max = [];
-    const pot_min = [];
-    const CUTOFF = 10;
-
-    if (isClosed) {
-        for (let i = 0; i < pts.length-1; i++) {
-            if ((pts[i].y < pts[mod(i-1, pts.length)].y && pts[i].y < pts[mod(i+1, pts.length)].y) || (pts[i].y > pts[mod(i-1, pts.length)].y && pts[i].y > pts[mod(i+1, pts.length)].y) || (pts[i].y == pts[mod(i-1, pts.length)].y)) {
-                potentialPts.push(new Point(pts[i].x, pts[i].y));
-            }
-        }
+    if (mode == 'maxima') {
+        turnPts = distantStationaryPts.filter((s: TurningPoint) => s.style === TurningPointStyle.MAXIMA).map((s: TurningPoint) => s.point);
     } else {
-        for (let i = CUTOFF; i < pts.length-1-CUTOFF; i++) {
-            if ((pts[i].y < pts[i-1].y && pts[i].y < pts[i+1].y) || (pts[i].y > pts[i-1].y && pts[i].y > pts[i+1].y) || (pts[i].y == pts[i-1].y)) {
-                potentialPts.push(new Point(pts[i].x, pts[i].y));
-            }
-        }
+        turnPts = distantStationaryPts.filter((s: TurningPoint) => s.style === TurningPointStyle.MINIMA).map((s: TurningPoint) => s.point);
     }
 
-    statPts = potentialPts;
-
-    let position = null;
-
-    for (let i = 0; i < statPts.length; i++) { 
-        for (let j = 0; j < pts.length; j++) {
-            if (statPts[i].x == pts[j].x) {
-                position = j;
-            }
-        }
-        if (!isDefined(position)) continue;
-        if (statPts[i].y < pts[mod(position-5, pts.length)].y && statPts[i].y < pts[mod(position+5, pts.length)].y) {
-            // if the point we have found is within 5 units of the previous point, only include one of them
-            // if (pts.findIndex((v: Point) => _isEqual(statPts[i], v)) === 0) {
-            pot_max.push(statPts[i]);
-        } else if (statPts[i].y > pts[mod(position-5, pts.length)].y && statPts[i].y > pts[mod(position+5, pts.length)].y) {
-            pot_min.push(statPts[i]);
-        }
-    }
-
-    mode == 'maxima' ? turnPts = pot_max : turnPts = pot_min;  
     turnPts.sort(sortByPointOrder.bind(undefined, pts));
     
     return turnPts;
+}
+
+// movablePoints is a list of all points that can be moved by the user. all movablePoints are importantPoints.
+// this includes curve maxima and minima, and endpoints for unclosed curves.
+// note that the actual calculation for these points is in recalculateCurveProperties.
+function _findMovablePoints(curve: Curve, sortByPoints: boolean) {
+    const endPts = !curve.isClosed ? findEndPts(curve.pts) : [];
+    const movablePoints = endPts.concat(curve.maxima, curve.minima);
+    if (sortByPoints) movablePoints.sort(sortByPointOrder.bind(undefined, curve.pts));
+    return movablePoints;
+}
+
+export function findMovablePoints(curve: Curve) {
+    return _findMovablePoints(curve, true);
 }
 
 // importantPoints is a list of all points that will not move when any other important point is stretched.
 // This includes the outermost points, the maxima and minima (for x and y), and the endpoints.
 // If two important points are close together, they will be treated as one, with priority going to endpoints, then x-min/x-max, then outermost, then y-min/y-max.
 export function findImportantPoints(curve: Curve) {
+    const movablePoints = _findMovablePoints(curve, false);
     const transposePoint = (pt: Point) => new Point(pt.y, pt.x);
     const transposedSelectedCurvePts = curve.pts.map(transposePoint);
     
     const yMaxima = findTurnPts(transposedSelectedCurvePts, 'maxima', curve.isClosed).map(transposePoint);
     const yMinima = findTurnPts(transposedSelectedCurvePts, 'minima', curve.isClosed).map(transposePoint);
     const outermostPts = findOutermostPts(curve.pts);
-
-    const endPoints: Point[] = (!curve.isClosed ? findEndPts(curve.pts) : []);
 
     // push all points from pts into arr that are not within GraphSketcher.IMPORTANT_POINT_DETECT_RADIUS of any point in arr
     const pushWithDistanceCheck = (arr: Point[], pts: Point[]) => {
@@ -447,7 +498,7 @@ export function findImportantPoints(curve: Curve) {
 
     let importantPoints : Point[] = [];
 
-    for (const ptsList of [endPoints, curve.maxima, curve.minima, yMinima, yMaxima, outermostPts]) {
+    for (const ptsList of [movablePoints, yMinima, yMaxima, outermostPts]) {
         pushWithDistanceCheck(importantPoints, ptsList);
     }
 
@@ -458,78 +509,45 @@ export function findImportantPoints(curve: Curve) {
     return importantPoints;
 }
 
+function calculateNearbyImportantPoints(curve : Curve, importantPoints : Point[], currImportant: Point) {
+    let prevPrevImportant : Point | undefined;
+    let prevImportant : Point | undefined;
+    let nextImportant : Point | undefined;
+    for (let i = 0; i < importantPoints.length; i++) {
+        if (!isDefined(importantPoints[i]) || !isDefined(currImportant)) {
+            break;
+        }
+        if (pointsEqual(importantPoints[i], currImportant)) {
+            if (curve.isClosed) {
+                // closed curves *should* always have at least 4 important points (max/min for each axis)
+                prevPrevImportant = (importantPoints.length <= 1) ? undefined : importantPoints[mod(i - 2, importantPoints.length)];
+                prevImportant = (importantPoints.length <= 1) ? undefined : importantPoints[mod(i - 1, importantPoints.length)]; 
+                nextImportant = (importantPoints.length <= 1) ? undefined : importantPoints[mod(i + 1, importantPoints.length)];
+            } else {
+                prevImportant = importantPoints[i - 1]; 
+                nextImportant = importantPoints[i + 1];
+            }
+            break;
+        }
+    }
+    return {prevImportant, nextImportant, prevPrevImportant};
+}
+
 
 // given a curve, translate the curve
 export function translateCurve(curve: Curve, dx: number, dy: number, canvasProperties: CanvasProperties) {
-    const pts = curve.pts;
+    curve.pts.forEach((pt) => {
+        pt.x += dx;
+        pt.y += dy;
+    });
 
-    curve.minX += dx;
-    curve.maxX += dx;
-    curve.minY += dy;
-    curve.maxY += dy;
-
-    for (let i = 0; i < pts.length; i++) {
-        pts[i].x += dx;
-        pts[i].y += dy;
-    }
-
-    function moveTurnPts(knots: Point[]) {
-        for (let i = 0; i < knots.length; i++) {
-            const knot = knots[i];
-
-            knot.x += dx;
-            knot.y += dy;
-        }
-    }
-
-    const maxima = curve.maxima;
-    moveTurnPts(maxima);
-
-    const minima = curve.minima;
-    moveTurnPts(minima);
-
-
-    const moveInter = function(inter: Point[], newInter: Point[]) {
-        for (let i = 0; i < inter.length; i++) {
-            // if (inter[i].symbol != undefined) {
-            //     let symbol = inter[i].symbol;
-
-            //     let found = false,
-            //         min = 50,
-            //         knot;
-            //     for (let j = 0; j < newInter.length; j++) {
-            //         if (getDist(inter[i], newInter[j]) < min) {
-            //             min = getDist(inter[i], newInter[j]);
-            //             knot = newInter[j];
-            //             found = true;
-            //         }
-            //     }
-
-            //     if (found) {
-            //         symbol.x = knot.x;
-            //         symbol.y = knot.y;
-            //         knot.symbol = symbol;
-            //     } 
-            // }
-        }
-        return newInter;
-    };
-
-    const interX = curve.interX,
-        newInterX = findInterceptX(canvasProperties, pts);
-    curve.interX = moveInter(interX, newInterX);
-
-    const interY = curve.interY,
-        newInterY = findInterceptY(canvasProperties, pts);
-    curve.interY = moveInter(interY, newInterY);
-
-    return;
+    recalculateCurveProperties(curve, canvasProperties);
 }
 
 
 export const sortByPointOrder = (pts: Point[], a: Point, b: Point) => pts.findIndex((v: Point) => pointsEqual(a, v)) - pts.findIndex((v: Point) => pointsEqual(b, v));
 
-export function rotateCurve(curve: Curve, angle: number, center: Point) {
+export function rotateCurve(curve: Curve, angle: number, center: Point, canvasProperties: CanvasProperties) {
     const pts = curve.pts;
     
     function rotatePoint(point: Point, angle: number, center: Point) {
@@ -542,36 +560,21 @@ export function rotateCurve(curve: Curve, angle: number, center: Point) {
     }
 
     pts.map(pt => rotatePoint(pt, angle, center));
+
+    recalculateCurveProperties(curve, canvasProperties);
 }
 
 
-export function stretchTurningPoint(importantPoints: Point[], e: MouseEvent | Touch, selectedCurve: Curve, isMaxima: boolean, selectedPointIndex: number|undefined, prevMousePt: Point, canvasProperties: CanvasProperties) {
-    if (!isDefined(selectedPointIndex)) return;
-
-    const mousePosition = getMousePt(e);
-    // let turningPoints = isMaxima ? selectedCurve.maxima : selectedCurve.minima;
-    const movablePoints = selectedCurve.minima.concat(selectedCurve.maxima, findEndPts(selectedCurve.pts));
-    movablePoints.sort(sortByPointOrder.bind(undefined, selectedCurve.pts));
+export function stretchTurningPoint(selectedCurve: Curve, movedPoint: Point, mousePosition: Point, canvasProperties: CanvasProperties) {
     
-    let prevImportant : Point | undefined;
-    let nextImportant : Point | undefined;
-    let currImportant = movablePoints[selectedPointIndex];
-    for (let i = 0; i < importantPoints.length; i++) {
-        if (!isDefined(importantPoints[i]) || !isDefined(currImportant)) {
-            break;
-        }
-        if (pointsEqual(importantPoints[i], currImportant)) {
-            if (selectedCurve.isClosed) {
-                prevImportant = (importantPoints.length <= 1) ? undefined : importantPoints[mod(i - 1, importantPoints.length)]; 
-                nextImportant = (importantPoints.length <= 1) ? undefined : importantPoints[mod(i + 1, importantPoints.length)];
-            } else {
-                prevImportant = importantPoints[i - 1]; 
-                nextImportant = importantPoints[i + 1];
-            }
-            break;
-        }
-    }
-
+    let importantPoints = findImportantPoints(selectedCurve);
+    
+    const nearbyImportants = calculateNearbyImportantPoints(selectedCurve, importantPoints, movedPoint);
+    const prevPrevImportant = nearbyImportants.prevPrevImportant;
+    let prevImportant = nearbyImportants.prevImportant;
+    let currImportant = movedPoint;
+    let nextImportant = nearbyImportants.nextImportant;
+    
     let withinXBoundary = false;
     let withinYBoundary = false;
 
@@ -581,6 +584,7 @@ export function stretchTurningPoint(importantPoints: Point[], e: MouseEvent | To
     if (prevImportant && nextImportant) {
         const leftImportant = (prevImportant.x < nextImportant.x) ? prevImportant : nextImportant;
         const rightImportant = (prevImportant.x < nextImportant.x) ? nextImportant : prevImportant;
+        const isMaxima = selectedCurve.maxima.findIndex((maxima) => pointsEqual(maxima, movedPoint)) !== -1;
         withinXBoundary = (rightImportant.x - mousePosition.x) > XBUFFER && (mousePosition.x - leftImportant.x) > XBUFFER;
         withinYBoundary = (isMaxima && ((rightImportant.y - mousePosition.y) > YBUFFER && (leftImportant.y - mousePosition.y) > YBUFFER)) || (!isMaxima && ((mousePosition.y - rightImportant.y) > YBUFFER && (mousePosition.y - leftImportant.y) > YBUFFER));
     } else {
@@ -612,19 +616,48 @@ export function stretchTurningPoint(importantPoints: Point[], e: MouseEvent | To
             mousePosition.y = currImportant.y;
         }
 
-        let currentSectionState = (prevImportant) ? 0 : 1;
+        // not in-place!
+        const rotateList = (list: Point[], n: number) => list.slice(n).concat(list.slice(0, n));
 
-        // this must be run before the switch if there is no earlier important point,
-        // and must be run after the switch if there is no later important point.
-        // cases with both work with either position.
+        // rotate internal curve representation if closed -- see below
+        const originalPrevPrevImportantIndex = selectedCurve.pts.findIndex((v: Point) => pointsEqual(v, prevPrevImportant));
+        if (selectedCurve.isClosed && isDefined(originalPrevPrevImportantIndex)) {
+            // rotate so pPI is the first point, then recalculate curve properties
+            selectedCurve.pts = rotateList(selectedCurve.pts, originalPrevPrevImportantIndex);
+            recalculateCurveProperties(selectedCurve, canvasProperties);
+
+            importantPoints = findImportantPoints(selectedCurve);
+            const rotatedImportants = calculateNearbyImportantPoints(selectedCurve, importantPoints, currImportant);
+            prevImportant = rotatedImportants.prevImportant;
+            nextImportant = rotatedImportants.nextImportant;
+        }
+
+        // we start the following foreach loop in state given by currentSectionState:
+        let currentSectionState = (prevImportant) ? 0 : 1;
+        // it is incremented at most once per iteration, determining which section of the curve we are in (leftStatic, leftStretched, rightStretched, rightStatic):
         const updateSectionState = (pt : Point) => {
-            if (pointsEqual(pt, prevImportant) || pointsEqual(pt, currImportant) || pointsEqual(pt, nextImportant)) {
-                currentSectionState = (currentSectionState + 1) % 4;
-            }
+            // note: this can't be simplified into an (a || b || ... ? currentSectionState+1 % 4) because two of the same point can appear twice in a row in closed loops.
+            if (pointsEqual(pt, prevImportant)) currentSectionState = 1;
+            if (pointsEqual(pt, currImportant)) currentSectionState = 2;
+            if (pointsEqual(pt, nextImportant)) currentSectionState = 3;
+            if (pointsEqual(pt, prevPrevImportant)) currentSectionState = 0;
         };
+        // we *almost* always start in leftStatic.
+        // if the line is not closed:
+            // if we are stretching any point other than an endpoint, the endpoints are always static, so we can start in leftStatic.
+            // if we are stretching the start point, leftStatic will be empty, so we will start in leftStretched -- hence the undefined check on prevImportant above.
+            // if we are stretching the end point, rightStatic will be empty, but we don't need to do anything extra to account for this.
+        // if the line is closed:
+            // there are no endpoints, but we know there are at least 4 important points (min/max on both axes).
+            // therefore, assume any important point that is not the selected point or the prev/next important point (i.e. prevPrevImportant) is the first point.
+                // i.e. able to start in leftStatic if we rotate so the prevPrevImportant is the first point.
 
         selectedCurve.pts.forEach(pt => {
             if (!isDefined(prevImportant)) {
+                // this must be run before the switch if there is no earlier important point,
+                // and must be run after the switch if there is no later important point.
+                // cases with both work with either position.
+                // otherwise, one additional point gets added to the left/right stretch points each iteration, causing increasing weirdness.
                 updateSectionState(pt);
             }
 
@@ -672,6 +705,11 @@ export function stretchTurningPoint(importantPoints: Point[], e: MouseEvent | To
         selectedCurve.pts.push(...rightStretchedCurve.pts);
         selectedCurve.pts.push(...rightStaticPoints);
 
+        if (selectedCurve.isClosed && isDefined(originalPrevPrevImportantIndex)) {
+            // rotate the curve back
+            selectedCurve.pts = rotateList(selectedCurve.pts, selectedCurve.pts.length - originalPrevPrevImportantIndex);
+        }
+
         recalculateCurveProperties(selectedCurve, canvasProperties);
     }
     return selectedCurve;
@@ -679,12 +717,17 @@ export function stretchTurningPoint(importantPoints: Point[], e: MouseEvent | To
 
 export function stretchCurve(c: Curve, orx: number, ory: number, nrx: number, nry: number, baseX: number, baseY: number) {
 
-    function stretch(pt: Point) {
-        const nx = (pt.x - baseX) / orx;
-        const ny = (pt.y - baseY) / ory;
-        pt.x = nx * nrx + baseX;
-        pt.y = ny * nry + baseY;
-    }
+    const stretch = (pt: Point) => {
+        if (Math.abs(orx) >= 1e-3) {
+            const nx = (pt.x - baseX) / orx;
+            pt.x = nx * nrx + baseX;
+        }
+        if (Math.abs(ory) >= 1e-3) {
+            const ny = (pt.y - baseY) / ory;
+            pt.y = ny * nry + baseY;
+        }
+    };
+    
     // stretch each point
     c.pts.forEach(stretch);
 }

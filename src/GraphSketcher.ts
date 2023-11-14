@@ -1,5 +1,5 @@
 import p5 from 'p5';
-import GraphView from './GraphView';
+import GraphView, { AxisStretchPosition, StretchMode } from './GraphView';
 import { isDefined } from './GraphUtils';
 import * as GraphUtils from './GraphUtils';
 import _cloneDeep from 'lodash/cloneDeep';
@@ -94,6 +94,7 @@ export class GraphSketcher {
     public  checkPointsRedo: Checkpoint[] = [];
 
     public static CURVE_LIMIT = 3;
+    public static MERGE_STATIONARY_POINT_RADIUS = 5;
     public static CLIP_RADIUS = 15;
     public static MOUSE_DETECT_RADIUS = 10;
     public static IMPORTANT_POINT_DETECT_RADIUS = 30;
@@ -112,14 +113,10 @@ export class GraphSketcher {
 
     // for moving and stretching curve
     private movedCurveIdx?: number;
-    private stretchMode?: string;
+    private stretchMode?: StretchMode;
     private isMaxima?: boolean;
     private outOfBoundsCurvePoint?: Point;
     private rotationCenter?: Point;
-
-    // for moving symbols
-    private movedSymbol?: null; // TODO: WTF is this?
-    private symbolType?: string;
 
     private _oldState: GraphSketcherState;
     private _state: GraphSketcherState;
@@ -141,9 +138,7 @@ export class GraphSketcher {
             this.reDraw();
         }
     }
-    private clickedKnot?: number;
-    private clickedKnotId?: number;
-    private clickedCurve?: number;
+    private clickedKnotIdx?: number; // the index into movablePoints of the clicked knot. we can't store the point itself as it changes when dragged
     private clickedCurveIdx?: number;
 
     private hiddenKnotCurveIdxs: number[] = [];
@@ -395,7 +390,6 @@ export class GraphSketcher {
 
         const checkPointUndo = this.checkPointsUndo.pop();
         this._state = JSON.parse(checkPointUndo?.curvesJSON ?? "");
-        this.clickedKnot = undefined;
         this.clickedCurveIdx = undefined;
 
         this.reDraw();
@@ -414,7 +408,6 @@ export class GraphSketcher {
         const checkPointRedo = this.checkPointsRedo.pop();
         this._state = JSON.parse(checkPointRedo?.curvesJSON ?? "");
 
-        this.clickedKnot = undefined;
         this.clickedCurveIdx = undefined;
 
         this.reDraw();
@@ -534,9 +527,6 @@ export class GraphSketcher {
         this.isMouseDragged = false;
         this.action = Action.NO_ACTION;
 
-        this.movedSymbol = undefined;
-        this.symbolType = undefined;
-
         this.drawnPts = [];
 
         switch (this.colorSelect?.value) {
@@ -586,27 +576,26 @@ export class GraphSketcher {
                 detect(c.minX - 3, (c.minY + c.maxY)/2) || detect(c.maxX + 3, (c.minY + c.maxY)/2)) {
 
                 if (detect(c.minX, c.minY)) {
-                    this.stretchMode = "bottomLeft";
+                    this.stretchMode = StretchMode.BOTTOMLEFT;
                 } else if (detect(c.maxX, c.minY)) {
-                    this.stretchMode = "bottomRight";
+                    this.stretchMode = StretchMode.BOTTOMRIGHT;
                 } else if (detect(c.maxX, c.maxY)) {
-                    this.stretchMode = "topRight";
+                    this.stretchMode = StretchMode.TOPRIGHT;
                 } else if (detect(c.minX, c.maxY)) {
-                    this.stretchMode = "topLeft";
+                    this.stretchMode = StretchMode.TOPLEFT;
                 } else if (detect((c.minX + c.maxX)/2, c.minY - 3)) {
-                    this.stretchMode = "bottomMiddle";
+                    this.stretchMode = StretchMode.BOTTOM;
                 } else if (detect((c.minX + c.maxX)/2, c.maxY + 3)) {
-                    this.stretchMode = "topMiddle";
+                    this.stretchMode = StretchMode.TOP;
                 } else if (detect(c.minX - 3, (c.minY + c.maxY)/2)) {
-                    this.stretchMode = "leftMiddle";
+                    this.stretchMode = StretchMode.LEFT;
                 } else {
-                    this.stretchMode = "rightMiddle";
+                    this.stretchMode = StretchMode.RIGHT;
                 }
 
-                this.graphView.drawCorner(this.stretchMode || "none", c);
+                this.graphView.drawCorner(this.stretchMode, c);
 
                 this.action = Action.STRETCH_CURVE;
-                this.clickedKnot = undefined;
                 this.prevMousePt = mousePosition;
                 return;
             }
@@ -614,7 +603,6 @@ export class GraphSketcher {
             else if (detect(c.minX - 16, c.minY - 16) || detect(c.maxX + 16, c.minY - 16) || detect(c.minX - 16, c.maxY + 16) || detect(c.maxX + 16, c.maxY + 16)) {
                 // rotate curve
                 this.action = Action.ROTATE_CURVE;
-                this.clickedKnot = undefined;
                 this.prevMousePt = mousePosition;
                 this.rotationCenter = new Point((c.minX + c.maxX) / 2, (c.minY + c.maxY) / 2);
 
@@ -624,19 +612,15 @@ export class GraphSketcher {
 
         if (isDefined(this._state.curves) && this._state.curves.length > 0) {
             for (let i = 0; i < this._state.curves.length; i++) {
-                const maxima = this._state.curves[i].maxima;
-                const minima = this._state.curves[i].minima;
-                const draggablePoints = minima.concat(maxima, GraphUtils.findEndPts(this._state.curves[i].pts));
-                draggablePoints.sort(GraphUtils.sortByPointOrder.bind(this, this._state.curves[i].pts));
+                const movablePoints = GraphUtils.findMovablePoints(this._state.curves[i]);
 
-                for (let j = 0; j < draggablePoints.length; j++) {
-                    const knot = draggablePoints[j];
-                    if (GraphUtils.getDist(mousePosition, knot) < GraphSketcher.MOUSE_DETECT_RADIUS + 10) {
-                        this.clickedCurve = i;
+                for (let j = 0; j < movablePoints.length; j++) {
+                    const knot = movablePoints[j];
+                    if (GraphUtils.getDist(mousePosition, knot) < GraphSketcher.MOUSE_DETECT_RADIUS + 10) { //TODO: why is this +10
+                        this.clickedCurveIdx = i;
                         this.action = Action.STRETCH_POINT;
-                        this.clickedKnotId = j;
+                        this.clickedKnotIdx = j;
                         this.prevMousePt = mousePosition;
-                        this.isMaxima = maxima.includes(knot);
                         return;
                     }
                 }
@@ -647,7 +631,6 @@ export class GraphSketcher {
                         this.clickedCurveIdx = i;
                         this.movedCurveIdx = i;
                         this.action = Action.MOVE_CURVE;
-                        this.clickedKnot = undefined;
                         this.prevMousePt = mousePosition;
                         return;
                     }
@@ -660,10 +643,9 @@ export class GraphSketcher {
             this.action = Action.DRAW_CURVE;
         }
 
-        if (isDefined(this.clickedCurveIdx) || isDefined(this.clickedKnot)) {
+        if (isDefined(this.clickedCurveIdx)) {
             // TODO: Wipe off that stupid look on my face every time I see this
             this.clickedCurveIdx = undefined;
-            this.clickedKnot = undefined;
             this.reDraw();
         }
     };
@@ -680,16 +662,15 @@ export class GraphSketcher {
         const mousePosition = GraphUtils.getMousePt(e);
         this.releasePt = mousePosition;
 
-        if (this.action === Action.STRETCH_POINT && isDefined(this.clickedCurve) && isDefined(this._state.curves)) {
-            const selectedCurve = this._state.curves[this.clickedCurve];
-            
-            const importantPoints = GraphUtils.findImportantPoints(selectedCurve);
+        if (this.action === Action.STRETCH_POINT && isDefined(this.clickedCurveIdx) && isDefined(this._state.curves)) {
+            const selectedCurve = this._state.curves[this.clickedCurveIdx];
 
-            // maxima and minima are treated in slightly different ways
-            if (isDefined(this.isMaxima)) {
-                const curve = GraphUtils.stretchTurningPoint(importantPoints, e, selectedCurve, this.isMaxima, this.clickedKnotId, this.prevMousePt, this.canvasProperties);
+            if (isDefined(this.clickedKnotIdx)) {
+                const movablePoints = GraphUtils.findMovablePoints(selectedCurve); // these come sorted in point order
+                const movedPoint = movablePoints[this.clickedKnotIdx];
+                const curve = GraphUtils.stretchTurningPoint(selectedCurve, movedPoint, mousePosition, this.canvasProperties);
                 if (isDefined(curve)) {
-                    this._state.curves[this.clickedCurve] = curve;
+                    this._state.curves[this.clickedCurveIdx] = curve;
                 }
             }
 
@@ -712,7 +693,7 @@ export class GraphSketcher {
             const startingAngle = GraphUtils.getAngle(this.rotationCenter, this.prevMousePt);
             const currentAngle = GraphUtils.getAngle(this.rotationCenter, mousePosition);
 
-            GraphUtils.rotateCurve(curve, currentAngle - startingAngle, this.rotationCenter);
+            GraphUtils.rotateCurve(curve, currentAngle - startingAngle, this.rotationCenter, this.canvasProperties);
             
             this.prevMousePt = mousePosition;
             
@@ -720,105 +701,49 @@ export class GraphSketcher {
                 this.hiddenKnotCurveIdxs.push(this.clickedCurveIdx);
             }
             
-            GraphUtils.recalculateCurveProperties(curve, this.canvasProperties);
             this.outOfBoundsCurvePoint = this.isCurveOutsidePlot(this.clickedCurveIdx) ? this.getAveragePoint(this._state.curves[this.clickedCurveIdx].pts) : undefined;
             this.reDraw();
-        } else if (this.action === Action.STRETCH_CURVE && isDefined(this.clickedCurveIdx) && isDefined(this._state.curves)) {
+        } else if (this.action === Action.STRETCH_CURVE && isDefined(this.clickedCurveIdx) && isDefined(this._state.curves) && isDefined(this.stretchMode)) {
             this.p.cursor(this.p.MOVE);
 
-            const dx = mousePosition.x - this.prevMousePt.x;
-            const dy = mousePosition.y - this.prevMousePt.y;
-            this.prevMousePt = mousePosition;
-
             const currentCurve = this._state.curves[this.clickedCurveIdx];
+
+            const baseX = (this.stretchMode?.x === AxisStretchPosition.MIN) ? currentCurve.maxX : (this.stretchMode?.x === AxisStretchPosition.MAX) ? currentCurve.minX : (currentCurve.minX + currentCurve.maxX)/2;
+            const baseY = (this.stretchMode?.y === AxisStretchPosition.MIN) ? currentCurve.maxY : (this.stretchMode?.y === AxisStretchPosition.MAX) ? currentCurve.minY : (currentCurve.minY + currentCurve.maxY)/2;
+            const oldDraggedBoxX = (this.stretchMode?.x === AxisStretchPosition.MIN) ? currentCurve.minX : (this.stretchMode?.x === AxisStretchPosition.MAX) ? currentCurve.maxX : (currentCurve.minX + currentCurve.maxX)/2;
+            const oldDraggedBoxY = (this.stretchMode?.y === AxisStretchPosition.MIN) ? currentCurve.minY : (this.stretchMode?.y === AxisStretchPosition.MAX) ? currentCurve.maxY : (currentCurve.minY + currentCurve.maxY)/2;
+
+            const dx = mousePosition.x - oldDraggedBoxX;
+            const dy = mousePosition.y - oldDraggedBoxY;
+            this.prevMousePt = mousePosition;
 
             // calculate old x,y range
             const orx = currentCurve.maxX - currentCurve.minX;
             const ory = currentCurve.maxY - currentCurve.minY;
 
-            this.graphView.drawCorner(this.stretchMode || "none", currentCurve);
+            this.graphView.drawCorner(this.stretchMode, currentCurve);
 
-            // update the position of stretched vertex
-            switch (this.stretchMode) {
-                case "bottomLeft":
-                    currentCurve.minX += (orx < 30 && dx > 0) ? 0 : dx + Math.min(0, currentCurve.maxX - (currentCurve.minX + dx) - 30);
-                    currentCurve.minY += (ory < 30 && dy > 0) ? 0 : dy + Math.min(0, currentCurve.maxY - (currentCurve.minY + dy) - 30);
-                    break;
-                case "bottomRight":
-                    currentCurve.maxX += (orx < 30 && dx < 0) ? 0 : dx - Math.min(0, (currentCurve.maxX + dx) - currentCurve.minX - 30);
-                    currentCurve.minY += (ory < 30 && dy > 0) ? 0 : dy + Math.min(0, currentCurve.maxY - (currentCurve.minY + dy) - 30);
-                    break;
-                case "topRight":
-                    currentCurve.maxX += (orx < 30 && dx < 0) ? 0 : dx - Math.min(0, (currentCurve.maxX + dx) - currentCurve.minX - 30);
-                    currentCurve.maxY += (ory < 30 && dy < 0) ? 0 : dy - Math.min(0, (currentCurve.maxY + dy) - currentCurve.minY - 30);
-                    break;
-                case "topLeft":
-                    currentCurve.minX += (orx < 30 && dx > 0) ? 0 : dx + Math.min(0, currentCurve.maxX - (currentCurve.minX + dx) - 30);
-                    currentCurve.maxY += (ory < 30 && dy < 0) ? 0 : dy - Math.min(0, (currentCurve.maxY + dy) - currentCurve.minY - 30);
-                    break;
-                case "bottomMiddle":
-                    if ( ory < 30 && dy > 0) {
-                        return;
-                    }
-                    currentCurve.minY += dy + Math.min(0, currentCurve.maxY - (currentCurve.minY + dy) - 30);
-                    break;
-                case "topMiddle":
-                    if (ory < 30 && dy < 0) {
-                        return;
-                    }
-                    currentCurve.maxY += dy - Math.min(0, (currentCurve.maxY + dy) - currentCurve.minY - 30);
-                    break;
-                case "leftMiddle":
-                    if (orx < 30 && dx > 0) {
-                        return;
-                    }
-                    currentCurve.minX += dx + Math.min(0, currentCurve.maxX - (currentCurve.minX + dx) - 30);
-                    break;
-                case "rightMiddle":
-                    if (orx < 30 && dx < 0) {
-                        return;
-                    }
-                    currentCurve.maxX += dx - Math.min(0, (currentCurve.maxX + dx) - currentCurve.minX - 30);
-                    break;
-            }
+            const dMinX = (this.stretchMode?.x === AxisStretchPosition.MIN) ? dx + Math.min(0, currentCurve.maxX - (currentCurve.minX + dx) - 30) : 0;
+            const dMaxX = (this.stretchMode?.x === AxisStretchPosition.MAX) ? dx - Math.min(0, (currentCurve.maxX + dx) - currentCurve.minX - 30) : 0;
+            const dMinY = (this.stretchMode?.y === AxisStretchPosition.MIN) ? dy + Math.min(0, currentCurve.maxY - (currentCurve.minY + dy) - 30) : 0;
+            const dMaxY = (this.stretchMode?.y === AxisStretchPosition.MAX) ? dy - Math.min(0, (currentCurve.maxY + dy) - currentCurve.minY - 30) : 0;
 
             // calculate the new range
-            const nrx = currentCurve.maxX - currentCurve.minX;
-            const nry = currentCurve.maxY - currentCurve.minY;
+            const nrx = (currentCurve.maxX + dMaxX) - (currentCurve.minX + dMinX);
+            const nry = (currentCurve.maxY + dMaxY) - (currentCurve.minY + dMinY);
 
             // stretch the curve
-            switch (this.stretchMode) {
-                case "bottomLeft":
-                    GraphUtils.stretchCurve(currentCurve, orx, ory, nrx, nry, currentCurve.maxX, currentCurve.maxY);
-                    break;
-                case "bottomRight":
-                    GraphUtils.stretchCurve(currentCurve, orx, ory, nrx, nry, currentCurve.minX, currentCurve.maxY);
-                    break;
-                case "topRight":
-                    GraphUtils.stretchCurve(currentCurve, orx, ory, nrx, nry, currentCurve.minX, currentCurve.minY);
-                    break;
-                case "topLeft":
-                    GraphUtils.stretchCurve(currentCurve, orx, ory, nrx, nry, currentCurve.maxX, currentCurve.minY);
-                    break;
-                case "bottomMiddle":
-                    GraphUtils.stretchCurve(currentCurve, orx, ory, orx, nry, (currentCurve.minX + currentCurve.maxX)/2, currentCurve.maxY);
-                    break;
-                case "topMiddle":
-                    GraphUtils.stretchCurve(currentCurve, orx, ory, orx, nry, (currentCurve.minX + currentCurve.maxX)/2, currentCurve.minY);
-                    break;
-                case "leftMiddle":
-                    GraphUtils.stretchCurve(currentCurve, orx, ory, nrx, ory, currentCurve.maxX, (currentCurve.minY + currentCurve.maxY)/2);
-                    break;
-                case "rightMiddle":
-                    GraphUtils.stretchCurve(currentCurve, orx, ory, nrx, ory, currentCurve.minX, (currentCurve.minY + currentCurve.maxY)/2);
-                    break;
-            }
+            GraphUtils.stretchCurve(currentCurve, orx, ory, nrx, nry, baseX, baseY);
+
             if (this.hiddenKnotCurveIdxs.length === 0 || !this.hiddenKnotCurveIdxs.includes(this.clickedCurveIdx)) {
                 this.hiddenKnotCurveIdxs.push(this.clickedCurveIdx);
             }
-            this.graphView.drawCorner(this.stretchMode || "none", currentCurve);
+            this.graphView.drawCorner(this.stretchMode, currentCurve);
 
             this.outOfBoundsCurvePoint = this.isCurveOutsidePlot(this.clickedCurveIdx) ? this.getAveragePoint(this._state.curves[this.clickedCurveIdx].pts) : undefined;
+
+            // update the position of stretched vertex
+            GraphUtils.recalculateCurveProperties(currentCurve, this.canvasProperties);
             this.reDraw();
         } else if (this.action === Action.DRAW_CURVE && this.drawnColorIdx >= 0) {
             this.p.cursor(this.p.CROSS);
@@ -910,8 +835,7 @@ export class GraphSketcher {
                 }
             }
 
-            if (isDefined(this.clickedKnot) || isDefined(this.clickedCurveIdx)) {
-                this.clickedKnot = undefined;
+            if (isDefined(this.clickedCurveIdx)) {
                 this.clickedCurveIdx = undefined;
                 this.reDraw();
             }
@@ -940,11 +864,12 @@ export class GraphSketcher {
                 this._state.curves.splice(this.clickedCurveIdx, 1);
                 this.clickedCurveIdx = undefined;
                 this.outOfBoundsCurvePoint = undefined;
-                this.reDraw();
             } else {
                 const curve = this._state.curves[this.clickedCurveIdx];
                 GraphUtils.recalculateCurveProperties(curve, this.canvasProperties);
             }
+            this.hiddenKnotCurveIdxs.pop();
+            this.reDraw();
         } else if (this.action === Action.DRAW_CURVE) {
 
             if (isDefined(this._state.curves) && this._state.curves.length < GraphSketcher.CURVE_LIMIT){
