@@ -42,6 +42,7 @@ export class Curve {
     interY: Point[] = [];
     maxima: Point[] = [];
     minima: Point[] = [];
+    lineType?: LineType;
     colorIdx: number = -1;
     isClosed: boolean = false;
 }
@@ -749,33 +750,7 @@ export class GraphSketcher {
             this.p.cursor(this.p.CROSS);
             if (isDefined(this._state.curves) && this._state.curves.length < GraphSketcher.CURVE_LIMIT) {
 
-                // Constrain mouse x position based on x-direction of line between last two points - this block is
-                // the only thing that enforces this, so will be easy to remove if it's not wanted (see `git blame`
-                // for the relevant commit)
-                let constrainedMouseX: number;
-                if (!this.allowMultiValuedFunctions) {
-                    if (this.drawnPts.length > 1) {
-                        const lastPointOffGrid = this.drawnPts[this.drawnPts.length - 1].x < this.canvasProperties.plotStartPx.x || this.drawnPts[this.drawnPts.length - 1].x > this.canvasProperties.plotEndPx.x;
-                        if (lastPointOffGrid || this.drawnPts[this.drawnPts.length - 1].x === this.drawnPts[this.drawnPts.length - 2].x) {
-                            return;
-                        } else if (this.drawnPts[this.drawnPts.length - 1].x < this.drawnPts[this.drawnPts.length - 2].x) {
-                            constrainedMouseX = this.p.constrain(mousePosition.x, this.canvasProperties.plotStartPx.x, this.drawnPts[this.drawnPts.length - 1].x - 0.1);
-                        } else {
-                            constrainedMouseX = this.p.constrain(mousePosition.x, this.drawnPts[this.drawnPts.length - 1].x + 0.1, this.canvasProperties.plotEndPx.x);
-                        }
-                    } else {
-                        // Check that there a decent amount of x-movement in the second point so we can be sure of the direction
-                        // that the user is trying to draw the curve in
-                        // TODO find the right threshold, might need a fair bit of testing
-                        if (this.drawnPts.length > 0 && Math.abs(this.drawnPts[0].x - mousePosition.x) < 2 / (Math.max(1, Math.abs(this.drawnPts[0].y - mousePosition.y)) ** 2)) {
-                            return;
-                        }
-                        constrainedMouseX = this.p.constrain(mousePosition.x, this.canvasProperties.plotStartPx.x, this.canvasProperties.plotEndPx.x);
-                    }
-                    // By induction, the x-position of the last three points is (strictly) increasing or decreasing (ignoring some weird edge cases)
-                } else {
-                    constrainedMouseX = this.p.constrain(mousePosition.x, this.canvasProperties.plotStartPx.x, this.canvasProperties.plotEndPx.x);
-                }
+                const constrainedMouseX = this.p.constrain(mousePosition.x, this.canvasProperties.plotStartPx.x, this.canvasProperties.plotEndPx.x);
                 const constrainedMouseY = this.p.constrain(mousePosition.y, this.canvasProperties.plotStartPx.y, this.canvasProperties.plotEndPx.y);
 
                 this.p.push();
@@ -910,6 +885,7 @@ export class GraphSketcher {
 
                 curve.pts = pts;
                 curve.colorIdx = this.drawnColorIdx;
+                curve.lineType = this.selectedLineType;
                 GraphUtils.recalculateCurveProperties(curve, this.canvasProperties);
                 this._state.curves.push(curve);
                 this.reDraw();

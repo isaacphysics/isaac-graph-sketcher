@@ -1,4 +1,4 @@
-import {CanvasProperties, Curve, Dimension, GraphSketcher, GraphSketcherState, Point} from "./GraphSketcher";
+import {CanvasProperties, Curve, Dimension, GraphSketcher, GraphSketcherState, LineType, Point} from "./GraphSketcher";
 
 export function pointsEqual(p?: Point, q?: Point) {
     if (!isDefined(p) || !isDefined(q)) return false;
@@ -12,6 +12,7 @@ export function isDefined<T>(stuff: T): stuff is NonNullable<T> {
 }
 
 const SAMPLE_INTERVAL = 10;
+const EXTREMA_DETECTION_HEIGHT = 5;
 const numOfPts = 200;
 
 // methods used in manipulating the graphs
@@ -420,6 +421,9 @@ export function findTurnPts(pts: Point[], mode: string, isClosed: boolean = fals
         if (pts[i].y < pts[mod(i-1, pts.length)].y) {
             while (pts[i].y == pts[mod(i+1, pts.length)].y) {
                 i += 1;
+                if (i == pts.length - 1) {
+                    return false;
+                }
             }
             return pts[i].y < pts[mod(i+1, pts.length)].y;
         }
@@ -430,16 +434,31 @@ export function findTurnPts(pts: Point[], mode: string, isClosed: boolean = fals
         if (pts[i].y > pts[mod(i-1, pts.length)].y) {
             while (pts[i].y == pts[mod(i+1, pts.length)].y) {
                 i += 1;
+                if (i == pts.length - 1) {
+                    return false;
+                }
             }
             return pts[i].y > pts[mod(i+1, pts.length)].y;
         }
         return false;
     };
 
+    // do any of the surrounding 5 points either side of i have a y value that is EXTREMA_DETECTION_HEIGHT units greater than (maxima) / less than (minima) pts[i].y? (remember y is inverted)
+    const isNotable = (i: number, style: TurningPointStyle) => {
+        for (let j = isClosed ? mod(i - 5, pts.length) : Math.max(0, i - 5); j < (isClosed ? mod(i + 5, pts.length) : Math.min(pts.length, i + 5)); j++) {
+            if (style === TurningPointStyle.MAXIMA && pts[mod(j, pts.length)].y > pts[i].y + EXTREMA_DETECTION_HEIGHT) {
+                return true;
+            } else if (style === TurningPointStyle.MINIMA && pts[mod(j, pts.length)].y < pts[i].y - EXTREMA_DETECTION_HEIGHT) {
+                return true;
+            }
+        }
+        return false;
+    };
+
     for (let i = CUTOFF; i < pts.length-1-CUTOFF; i++) {
-        if (isMaxima(i)) {
+        if (isMaxima(i) && isNotable(i, TurningPointStyle.MAXIMA)) {
             stationaryPts.push({point: new Point(pts[i].x, pts[i].y), style: TurningPointStyle.MAXIMA} as TurningPoint);
-        } else if (isMinima(i)) {
+        } else if (isMinima(i) && isNotable(i, TurningPointStyle.MINIMA)) {
             stationaryPts.push({point: new Point(pts[i].x, pts[i].y), style: TurningPointStyle.MINIMA} as TurningPoint);
         }
     }
@@ -568,6 +587,16 @@ export function rotateCurve(curve: Curve, angle: number, center: Point, canvasPr
 export function stretchTurningPoint(selectedCurve: Curve, movedPoint: Point, mousePosition: Point, canvasProperties: CanvasProperties) {
     
     let importantPoints = findImportantPoints(selectedCurve);
+    
+    if (selectedCurve.lineType === LineType.LINEAR) {
+        const currImportant = movedPoint;
+        const otherImportant = importantPoints.find((v) => !pointsEqual(v, currImportant));
+        if (isDefined(otherImportant)) {
+            stretchLinearCurve(selectedCurve, currImportant, mousePosition);
+            recalculateCurveProperties(selectedCurve, canvasProperties);
+        }
+        return selectedCurve;
+    }
     
     const nearbyImportants = calculateNearbyImportantPoints(selectedCurve, importantPoints, movedPoint);
     const prevPrevImportant = nearbyImportants.prevPrevImportant;
@@ -730,6 +759,19 @@ export function stretchCurve(c: Curve, orx: number, ory: number, nrx: number, nr
     
     // stretch each point
     c.pts.forEach(stretch);
+}
+
+export function stretchLinearCurve(c: Curve, current: Point, target: Point) {
+    const other = c.pts.find((v) => !pointsEqual(v, current));
+    if (!isDefined(other)) return;
+
+    const xDist = (target.x - other.x) / c.pts.length;
+    const yDist = (target.y - other.y) / c.pts.length;
+    
+    c.pts.forEach((pt, i) => {
+        pt.x = other.x + (i * xDist);
+        pt.y = other.y + (i * yDist);
+    });
 }
 
 function _clone<T>(obj: T) {
