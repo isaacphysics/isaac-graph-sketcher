@@ -364,8 +364,7 @@ export function findInterceptY(canvasProperties: CanvasProperties, pts: Point[])
 
     const intercepts = [];
 
-    if (pts[0].x == canvasProperties.centerPx.x) intercepts.push(pts[0]);
-    for (let i = 1; i < pts.length; i++) {
+    for (let i = 0; i < pts.length; i++) {
         if (pts[i].x === canvasProperties.centerPx.x) {
             const start = i;
             while (i < pts.length && pts[i].x === canvasProperties.centerPx.x) {
@@ -378,7 +377,7 @@ export function findInterceptY(canvasProperties: CanvasProperties, pts: Point[])
             continue;
         }
 
-        if ((pts[i-1].x - canvasProperties.centerPx.x) * (pts[i].x - canvasProperties.centerPx.x) < 0 && (pts[i-1].x - pts[i].x < Math.abs(200))) {
+        if (i > 0 && (pts[i-1].x - canvasProperties.centerPx.x) * (pts[i].x - canvasProperties.centerPx.x) < 0 && (pts[i-1].x - pts[i].x < Math.abs(200))) {
             const dx = pts[i].x - pts[i-1].x;
             const dy = pts[i].y - pts[i-1].y;
             const grad = dy/dx;
