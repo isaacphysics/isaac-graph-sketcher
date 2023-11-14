@@ -368,7 +368,7 @@ export function findInterceptY(canvasProperties: CanvasProperties, pts: Point[])
     for (let i = 1; i < pts.length; i++) {
         if (pts[i].x === canvasProperties.centerPx.x) {
             const start = i;
-            while (i < pts.length && pts[i].y === canvasProperties.centerPx.y) {
+            while (i < pts.length && pts[i].x === canvasProperties.centerPx.x) {
                 i++;
             }
             // show the intercept at the midpoint of the flat section, but only if there exist at least two other points not on the flat section
