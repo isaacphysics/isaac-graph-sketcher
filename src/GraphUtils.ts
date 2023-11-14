@@ -439,7 +439,7 @@ export function findTurnPts(pts: Point[], mode: string, isClosed: boolean = fals
         return false;
     };
 
-    // does any point within 5 points of i have a y value greater than (maxima) / less than (minima) (remember y is inverted) EXTREMA_DETECTION_HEIGHT units further than pts[i].y?
+    // do any of the surrounding 5 points either side of i have a y value that is EXTREMA_DETECTION_HEIGHT units greater than (maxima) / less than (minima) pts[i].y? (remember y is inverted)
     const isNotable = (i: number, style: TurningPointStyle) => {
         for (let j = isClosed ? mod(i - 5, pts.length) : Math.max(0, i - 5); j < (isClosed ? mod(i + 5, pts.length) : Math.min(pts.length, i + 5)); j++) {
             if (style === TurningPointStyle.MAXIMA && pts[mod(j, pts.length)].y > pts[i].y + EXTREMA_DETECTION_HEIGHT) {
