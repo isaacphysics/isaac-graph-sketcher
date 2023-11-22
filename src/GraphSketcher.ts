@@ -81,6 +81,14 @@ interface Checkpoint {
     clickedCurveIdx?: number;
 }
 
+interface GraphSketcherOptions {
+    previewMode: boolean;
+    initialCurves?: Curve[];
+    allowMultiValuedFunctions?: boolean;
+    axisLabelX?: string;
+    axisLabelY?: string;
+}
+
 export class GraphSketcher {
     private p: p5;
     private canvasProperties: CanvasProperties;
@@ -115,7 +123,6 @@ export class GraphSketcher {
     // for moving and stretching curve
     private movedCurveIdx?: number;
     private stretchMode?: StretchMode;
-    private isMaxima?: boolean;
     private outOfBoundsCurvePoint?: Point;
     private rotationCenter?: Point;
 
@@ -150,6 +157,9 @@ export class GraphSketcher {
     private trashButton?: HTMLButtonElement;
     private resetButton?: HTMLButtonElement;
 
+    private axisLabelX?: string;
+    private axisLabelY?: string;
+
     // The following public members can be modified from the outside
     public drawingColorName: string = "Blue";
     public selectedLineType = LineType.BEZIER;
@@ -157,7 +167,7 @@ export class GraphSketcher {
 
     public setupDone = false;
 
-    constructor(p: p5, width: number, height: number, options: { previewMode: boolean, initialCurves?: Curve[], allowMultiValuedFunctions?: boolean}) {
+    constructor(p: p5, width: number, height: number, options: GraphSketcherOptions) {
         this.p = p;
 
         // todo: we could use the state pattern for these methods, as behaviour largely depends on the current Action
@@ -174,8 +184,11 @@ export class GraphSketcher {
 
         this.p.setup = this.setup;
 
+        this.axisLabelX = options.axisLabelX;
+        this.axisLabelY = options.axisLabelY;
+
         this.canvasProperties = GraphSketcher.getCanvasPropertiesForResolution(width, height);
-        this.graphView = new GraphView(p, this.canvasProperties);
+        this.graphView = new GraphView(p, this.canvasProperties, this.axisLabelX, this.axisLabelY);
         this.previewMode = options.previewMode;
         this.allowMultiValuedFunctions = options.allowMultiValuedFunctions ?? false;
         this._state = GraphUtils.decodeData({ curves: options.initialCurves ?? [], canvasWidth: width, canvasHeight: height }, this.canvasProperties);
@@ -986,7 +999,7 @@ export class GraphSketcher {
     };
 }
 
-export function makeGraphSketcher(element: HTMLElement | undefined | null, width: number, height: number, options: { previewMode: boolean, initialCurves?: Curve[], allowMultiValuedFunctions?: boolean } = { previewMode: false, allowMultiValuedFunctions: false }): { sketch?: GraphSketcher, p: p5 } {
+export function makeGraphSketcher(element: HTMLElement | undefined | null, width: number, height: number, options: GraphSketcherOptions = { previewMode: false, allowMultiValuedFunctions: false }): { sketch?: GraphSketcher, p: p5 } {
     let sketch: GraphSketcher | undefined;
     const p = new p5(instance => {
         sketch = new GraphSketcher(instance, width, height, options);
