@@ -46,6 +46,9 @@ export default class GraphView {
     private ORIGIN_SLOP: number;
     private slopVisible = false;
 
+    private axisLabelX?: string;
+    private axisLabelY?: string;
+
     private DOT_LINE_COLOR = [123];
     private DEFAULT_KNOT_COLOR = [77,77,77];
 
@@ -57,13 +60,16 @@ export default class GraphView {
     public CURVE_STRKWEIGHT = 2;
     public KNOT_DETECT_COLOR = [0];
 
-    constructor(p: p5, canvasProperties: CanvasProperties) {
+    constructor(p: p5, canvasProperties: CanvasProperties, axisLabelX?: string, axisLabelY?: string) {
         this.p = p;
-        this.PADDING = 0.025 * canvasProperties.axisLengthPx;
+        this.PADDING = 0.03 * canvasProperties.axisLengthPx;
 
         // these values should be synced with those in IsaacGraphSketcherSettings.java in the API
         this.AXIS_SLOP = 0.005 * canvasProperties.axisLengthPx;
         this.ORIGIN_SLOP = 0.01 * canvasProperties.axisLengthPx;
+
+        this.axisLabelX = axisLabelX;
+        this.axisLabelY = axisLabelY;
 
         this.canvasProperties = canvasProperties;
         this.backgroundGraphic = this.p.createGraphics(canvasProperties.widthPx, canvasProperties.heightPx);
@@ -355,8 +361,25 @@ export default class GraphView {
         this.backgroundGraphic.fill(0);
 
         this.backgroundGraphic.text("O", this.canvasProperties.centerPx.x - 15, this.canvasProperties.centerPx.y + 15);
-        this.backgroundGraphic.text("x", this.canvasProperties.centerPx.x + this.canvasProperties.axisLengthPx/2 - this.PADDING, this.canvasProperties.centerPx.y + 15);
-        this.backgroundGraphic.text("y", this.canvasProperties.centerPx.x + 5, this.canvasProperties.centerPx.y - this.canvasProperties.axisLengthPx / 2 + this.PADDING);
+
+        // TODO: render these axis labels in LaTeX
+
+        // // make an HTML element
+        // const xAxisLabelLatex = this.p.createP();
+        // // render the LaTeX into it
+        // katex.render(GraphSketcher.axisLabelX, xAxisLabelLatex.elt);
+        // // convert into an image
+        // const _xAxisLabelPromise = domtoimage.toSvg(xAxisLabelLatex.elt).then((dataUrl) => {
+        //     // create an image element from this
+        //     const xAxisLabelImage = this.p.createImg(dataUrl, "");
+        //     // render the image
+        //     this.backgroundGraphic.image(xAxisLabelImage, this.canvasProperties.centerPx.x + this.canvasProperties.axisLengthPx/2 - this.PADDING, this.canvasProperties.centerPx.y + 15, 40, 40);
+        // });
+        // // then remove the original element
+        // xAxisLabelLatex.remove();
+        
+        this.backgroundGraphic.text(this.axisLabelX ?? "x", this.canvasProperties.centerPx.x + this.canvasProperties.axisLengthPx/2 - this.PADDING, this.canvasProperties.centerPx.y + 15);
+        this.backgroundGraphic.text(this.axisLabelY ?? "y", this.canvasProperties.centerPx.x + 5, this.canvasProperties.centerPx.y - this.canvasProperties.axisLengthPx / 2 + this.PADDING);
 
         this.backgroundGraphic.pop();
     }
