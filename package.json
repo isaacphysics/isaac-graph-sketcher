@@ -1,6 +1,6 @@
 {
   "name": "isaac-graph-sketcher",
-  "version": "0.13.3",
+  "version": "0.13.4",
   "description": "A graph sketching application to serve Isaac Physics.",
   "main": "./lib/bundle.js",
   "files": [
