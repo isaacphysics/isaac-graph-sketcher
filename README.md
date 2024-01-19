@@ -21,7 +21,7 @@ This also depends on a [back-end checker](https://github.com/isaacphysics/isaac-
 
 ## License
 
-Copyright 2016 University of Cambridge
+Copyright 2024 University of Cambridge
 
 Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may obtain a copy of the License at [http://www.apache.org/licenses/LICENSE-2.0](http://www.apache.org/licenses/LICENSE-2.0)
 
