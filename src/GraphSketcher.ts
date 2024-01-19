@@ -104,7 +104,8 @@ export class GraphSketcher {
 
     public static CURVE_LIMIT = 3;
     public static MERGE_STATIONARY_POINT_RADIUS = 5;
-    public static CLIP_RADIUS = 15;
+    public static CLIP_CLOSED_LOOP_RADIUS = 15;
+    public static CLIP_TO_AXIS_RADIUS = 4;
     public static MOUSE_DETECT_RADIUS = 10;
     public static IMPORTANT_POINT_DETECT_RADIUS = 30;
     public static REQUIRED_CURVE_ON_SCREEN_RATIO = 0.50; // 50% of a curves points must be on screen or it will be deleted
@@ -872,22 +873,22 @@ export class GraphSketcher {
                 this.checkPointsRedo = [];
 
                 // adjustment of start and end to attach to the axis automatically.
-                if (Math.abs(this.drawnPts[0].y - this.canvasProperties.centerPx.y) < GraphSketcher.CLIP_RADIUS) {
+                if (Math.abs(this.drawnPts[0].y - this.canvasProperties.centerPx.y) < GraphSketcher.CLIP_TO_AXIS_RADIUS) {
                     this.drawnPts[0].y = this.canvasProperties.centerPx.y;
                 }
-                if (Math.abs(this.drawnPts[0].x - this.canvasProperties.centerPx.x) < GraphSketcher.CLIP_RADIUS) {
+                if (Math.abs(this.drawnPts[0].x - this.canvasProperties.centerPx.x) < GraphSketcher.CLIP_TO_AXIS_RADIUS) {
                     this.drawnPts[0].x = this.canvasProperties.centerPx.x;
                 }
-                if (Math.abs(this.drawnPts[this.drawnPts.length - 1].y - this.canvasProperties.centerPx.y) < GraphSketcher.CLIP_RADIUS) {
+                if (Math.abs(this.drawnPts[this.drawnPts.length - 1].y - this.canvasProperties.centerPx.y) < GraphSketcher.CLIP_TO_AXIS_RADIUS) {
                     this.drawnPts[this.drawnPts.length - 1].y = this.canvasProperties.centerPx.y;
                 }
-                if (Math.abs(this.drawnPts[this.drawnPts.length - 1].x - this.canvasProperties.centerPx.x) < GraphSketcher.CLIP_RADIUS) {
+                if (Math.abs(this.drawnPts[this.drawnPts.length - 1].x - this.canvasProperties.centerPx.x) < GraphSketcher.CLIP_TO_AXIS_RADIUS) {
                     this.drawnPts[this.drawnPts.length - 1].x = this.canvasProperties.centerPx.x;
                 }
 
                 let pts: Point[] = [];
                 if (this.selectedLineType === LineType.BEZIER) {
-                    if (GraphUtils.getDist(this.drawnPts[0], this.drawnPts[this.drawnPts.length - 1]) < GraphSketcher.CLIP_RADIUS) {
+                    if (GraphUtils.getDist(this.drawnPts[0], this.drawnPts[this.drawnPts.length - 1]) < GraphSketcher.CLIP_CLOSED_LOOP_RADIUS) {
                         this.drawnPts.push(this.drawnPts[0]);
                         curve.isClosed = true;
                     }
