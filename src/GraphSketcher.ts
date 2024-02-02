@@ -85,6 +85,7 @@ interface GraphSketcherOptions {
     previewMode: boolean;
     initialCurves?: Curve[];
     allowMultiValuedFunctions?: boolean;
+    maxNumCurves?: number;
     axisLabelX?: string;
     axisLabelY?: string;
 }
@@ -102,7 +103,6 @@ export class GraphSketcher {
     public  checkPointsUndo: Checkpoint[] = [];
     public  checkPointsRedo: Checkpoint[] = [];
 
-    public static CURVE_LIMIT = 3;
     public static MERGE_STATIONARY_POINT_RADIUS = 5;
     public static CLIP_CLOSED_LOOP_RADIUS = 15;
     public static CLIP_TO_AXIS_RADIUS = 4;
@@ -158,6 +158,7 @@ export class GraphSketcher {
     private trashButton?: HTMLButtonElement;
     private resetButton?: HTMLButtonElement;
 
+    private maxNumCurves: number;
     private axisLabelX?: string;
     private axisLabelY?: string;
 
@@ -187,6 +188,7 @@ export class GraphSketcher {
 
         this.axisLabelX = options.axisLabelX;
         this.axisLabelY = options.axisLabelY;
+        this.maxNumCurves = options.maxNumCurves ?? 3;
 
         this.canvasProperties = GraphSketcher.getCanvasPropertiesForResolution(width, height);
         this.graphView = new GraphView(p, this.canvasProperties, this.axisLabelX, this.axisLabelY);
@@ -654,7 +656,7 @@ export class GraphSketcher {
         }
 
         // Does another check to make sure the mouse is inside the plot, and not just "active"
-        if (isDefined(this._state.curves) && this.isPointInsidePlot(mousePosition) && this._state.curves.length < GraphSketcher.CURVE_LIMIT){
+        if (isDefined(this._state.curves) && this.isPointInsidePlot(mousePosition) && this._state.curves.length < this.maxNumCurves){
             this.action = Action.DRAW_CURVE;
         }
 
@@ -762,7 +764,7 @@ export class GraphSketcher {
             this.reDraw();
         } else if (this.action === Action.DRAW_CURVE && this.drawnColorIdx >= 0) {
             this.p.cursor(this.p.CROSS);
-            if (isDefined(this._state.curves) && this._state.curves.length < GraphSketcher.CURVE_LIMIT) {
+            if (isDefined(this._state.curves) && this._state.curves.length < this.maxNumCurves) {
 
                 const constrainedMouseX = this.p.constrain(mousePosition.x, this.canvasProperties.plotStartPx.x, this.canvasProperties.plotEndPx.x);
                 const constrainedMouseY = this.p.constrain(mousePosition.y, this.canvasProperties.plotStartPx.y, this.canvasProperties.plotEndPx.y);
@@ -861,7 +863,7 @@ export class GraphSketcher {
             this.reDraw();
         } else if (this.action === Action.DRAW_CURVE) {
 
-            if (isDefined(this._state.curves) && this._state.curves.length < GraphSketcher.CURVE_LIMIT){
+            if (isDefined(this._state.curves) && this._state.curves.length < this.maxNumCurves){
 
                 if (this.drawnPts.length < 3 && this.selectedLineType !== LineType.LINEAR) {
                     // If the curve is too short or mostly outside the plot, don't add it
@@ -989,7 +991,7 @@ export class GraphSketcher {
         if (isDefined(this.clickedCurveIdx) && isDefined(this._state.curves)) {
             this.graphView.drawStretchBox(this.clickedCurveIdx, this._state.curves);
         }
-        if (isDefined(this._state.curves) && this._state.curves.length < 4) {
+        if (isDefined(this._state.curves) && this._state.curves.length <= this.maxNumCurves) {
             this.graphView.drawCurves(this._state.curves, undefined, this.hiddenKnotCurveIdxs);
         }
         this.graphView.drawBoundaries(this.canvasProperties);
