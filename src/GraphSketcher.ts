@@ -188,7 +188,7 @@ export class GraphSketcher {
 
         this.axisLabelX = options.axisLabelX;
         this.axisLabelY = options.axisLabelY;
-        this.maxNumCurves = options.maxNumCurves ?? 3;
+        this.maxNumCurves = options.maxNumCurves || 3;
 
         this.canvasProperties = GraphSketcher.getCanvasPropertiesForResolution(width, height);
         this.graphView = new GraphView(p, this.canvasProperties, this.axisLabelX, this.axisLabelY);
@@ -656,6 +656,7 @@ export class GraphSketcher {
         }
 
         // Does another check to make sure the mouse is inside the plot, and not just "active"
+        console.log(this._state.curves?.length, "out of", this.maxNumCurves);
         if (isDefined(this._state.curves) && this.isPointInsidePlot(mousePosition) && this._state.curves.length < this.maxNumCurves){
             this.action = Action.DRAW_CURVE;
         }
