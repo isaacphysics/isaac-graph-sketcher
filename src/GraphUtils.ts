@@ -118,6 +118,12 @@ export function decodeData(data: GraphSketcherState, canvasProperties: CanvasPro
 
     const normalisedCurves = [];
 
+    const samplePt = data?.curves?.[0]?.pts?.[0];
+    if (samplePt && (samplePt?.x === undefined || samplePt?.y === undefined)) {
+        console.error("Invalid curve data: c.pts is not a valid Point array. Ensure data is in the correct format with GraphSketcher.toInternalState().", data);
+        return { curves: [], canvasWidth: canvasProperties.widthPx, canvasHeight: canvasProperties.heightPx };
+    }
+
     for (const c of data.curves ?? []) {
         const curve = new Curve();
         curve.pts = c.pts.map((point: Point) => denormalisePoint(point));
