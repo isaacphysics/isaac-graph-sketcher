@@ -33,7 +33,9 @@
     "@types/node": "^16.18.126",
     "@types/p5": "^1.7.7",
     "@typescript-eslint/eslint-plugin": "^8.57.1",
+    "@typescript-eslint/parser": "^8.60.1",
     "babel-loader": "^8.4.1",
+    "eslint": "^8.57.1",
     "eslint-plugin-import": "^2.32.0",
     "eslint-plugin-n": "^15.0.0 || ^16.0.0 ",
     "eslint-plugin-promise": "^6.6.0",
@@ -54,8 +56,5 @@
     "> 5%",
     "last 2 versions",
     "not ie <= 8"
-  ],
-  "dependencies": {
-    "eslint": "^8.57.1"
-  }
+  ]
 }
